@@ -1,0 +1,30 @@
+# ---- 密钥：绝不入仓 ----
+# Key 文件里存放着 Tavily / DeepSeek / 钉钉的真实凭据，一旦提交就永久留在 git 历史里，
+# 即使之后删掉文件也还在。任何时候都不要用 git add -f 绕过这里。
+Key
+Key.*
+.env
+.env.*
+*.key
+*.pem
+*.p12
+secrets.*
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

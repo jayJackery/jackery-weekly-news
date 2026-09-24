@@ -1,0 +1,70 @@
+name: Weekly Industry News
+
+on:
+  schedule:
+    # cron 使用 UTC 时间。
+    # 0 1 * * 0 = UTC 每周日 01:00 = 北京时间每周一 09:00（中国不实行夏令时）。
+    #
+    # 提示：分钟位 0 落在整点，而 GitHub 官方明确点名「每小时整点是高负载时段，
+    # 定时任务可能被延迟甚至丢弃」。若实测发现推送时间不稳定，把 0 改成 7
+    # （即 '7 1 * * 0'，北京时间 09:07）即可。
+    - cron: '0 1 * * 0'
+  workflow_dispatch:   # 手动触发：Actions 页面的 Run workflow 按钮
+
+# 一旦声明 permissions，未列出的 scope 全部变成 none，所以 contents: write 必须显式写上。
+# 仓库默认权限可能是只读，那样最后一步的 git push 会失败。
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-news
+  cancel-in-progress: false
+
+jobs:
+  push-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        # persist-credentials 默认就是 true，正是为后续 git push 设计的，保持默认即可。
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+        # 注意：setup-python v7 已移除 pip-install input，依赖用下面的独立步骤安装。
+
+      - name: Guard - 确认密钥文件未被 git 跟踪
+        run: |
+          if git ls-files --error-unmatch Key >/dev/null 2>&1; then
+            echo "::error file=Key::Key 文件被 git 跟踪，存在密钥泄露风险，已中止。请执行 git rm --cached Key 并检查 .gitignore。"
+            exit 1
+          fi
+          echo "OK: Key 未被跟踪"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run news bot
+        env:
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+        run: python main.py
+
+      - name: Commit history
+        # 用 always() 保证推送环节失败时，已抓取的记录也能尽量保住。
+        if: always()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add history_urls.json
+          if git diff --staged --quiet; then
+            echo "history_urls.json 无变化，跳过提交"
+          else
+            git commit -m "chore: update history_urls.json [skip ci]"
+            git push
+          fi
