@@ -71,7 +71,8 @@ JACKERY_PRODUCTS = """\
 - SolarSaga 系列：折叠太阳能板（检索命中 SolarSaga 200 / 100 Light，IP68、IEC63163）
 - HomePower 系列：家庭备电 / 全屋储能系统（检索命中 HomePower 3600 Pro Max）
 - SolarVault 系列：阳台储能系统（检索命中 SolarVault 3，可扩展至全屋）
-- Fridge Guard 系列：（⚠️ 待补充一句话定位 —— 这行是占位，请按实际产品改写）"""
+- FridgeGuard：冰箱等单设备备电。卧式 CTB 结构，约 67mm 超薄，可立放/平放/壁挂，
+  单口 800W（峰值 1600W），可扩容至 2kWh，UPS 级无缝切换（平时当智能插座用）"""
 
 # 每周跑完后，模型会把"本期资讯里出现的、但不在 JACKERY_PRODUCTS 里的华宝产品线"报回来，
 # 提醒维护者更新上面那份清单。见 report_product_line_updates()。
@@ -79,13 +80,19 @@ JACKERY_PRODUCTS = """\
 # URL 路径里出现这些片段就判为无信息价值的页面，在进模型之前就丢掉。
 #
 # 为什么要在 Python 里硬拦，而不是只靠提示词：实测提示词拦不住。
-# 上一版明确写了"纯折扣稿一律丢弃"，模型仍然放进来一条 CNET 的
+# 明确写了"纯折扣稿一律丢弃"，模型仍然放进来一条 CNET 的
 # /deals/runhood-rallye-600-mini-power-station-deal-... —— 因为它把折扣页
 # 包装成了一条像模像样的"可插拔电池模组"解读。路径特征比语义判断可靠得多。
+#
+# ⚠️ 这份清单**只收促销页和聚合页**，不要往里加厂商的产品页 / 下载页
+#    （/product/、/downloads/ 之类）。曾经加过，结果把
+#    dji.com/cn/downloads/products/power-auro-2000-elite 一起拦掉了 ——
+#    而那是那一周唯一一条大疆新品的信息，得不偿失。
+#    厂商自营页交给提示词判断（它确实会丢掉一部分厂商产品页），
+#    判断失误的代价远小于硬拦误伤。
 JUNK_URL_SEGMENTS = [
     "/deals/", "/deal/", "/coupon", "/promo", "/discount", "/voucher",
-    "/shop/", "/store/", "/cart/", "/product/", "/products/",
-    "/downloads/", "/download/",   # 厂商下载中心，不是报道
+    "/shop/", "/store/", "/cart/",
     "/tag/", "/category/",         # 聚合页
 ]
 
