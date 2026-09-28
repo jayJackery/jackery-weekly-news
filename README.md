@@ -165,6 +165,7 @@ python main.py                        # 完整流程，真的会发钉钉
 | 想改什么 | 改哪里 |
 |---|---|
 | 检索重点、板块口径、写作风格 | `main.py` 顶部的 `ROLE_AND_RULES`（三个提示词共用） |
+| 板块一收录哪些厂商 | `main.py` 顶部的 `SECTION1_VENDORS`（**Jackery 刻意不在清单里，别加回去** —— 加了模型就会把自家新品写进竞品板块；自家产品只在板块五出现） |
 | 促销稿过滤规则 | `main.py` 顶部的 `PROMO_URL_TOKENS` / `SELF_DISQUALIFY_RE` 等常量 |
 | 第五板块能引用的华宝产品线 | `main.py` 顶部的 `JACKERY_PRODUCTS`（**产品线变动时必须同步**） |
 | 换模型（不用改代码） | 环境变量 `OPENROUTER_MODEL`，默认 `perplexity/sonar-pro-search` |

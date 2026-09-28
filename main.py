@@ -435,6 +435,8 @@ ROLE_AND_RULES = f"""你是储能行业的资深硬件分析师，长期服务�
   「……不将其作为新品处理」一并删除，写出来只会浪费篇幅。
 - 某个板块本周确实没有实质动态时，**一句话说明即可**，不要用占位条撑篇幅。
 - 厂商名与产品型号用**粗体**。
+- ⚠️ **同一厂商的多条动态要连续排布**，不要与其他厂商交叉。读者是按厂商看的，
+  同一家的三条被隔开在两处就很难读。
 - 中文撰写。英文来源的厂商名与产品型号保留原文（如 EcoFlow、Anker SOLIX S2000、
   BLUETTI Balco 500），**不要音译或意译成中文**。
 - 篇幅要够：读者宁可长一点，也不要一份只有标题的空壳。但要**靠真事件堆篇幅，
@@ -445,6 +447,10 @@ ROLE_AND_RULES = f"""你是储能行业的资深硬件分析师，长期服务�
 - ⚠️ **本期动态少时，报告短是正常的、可以接受的。** 这跟上面"篇幅要够"不冲突：
   宁可用三条真事件撑起一个板块，也不要为了凑篇幅去写占位条、写促销稿，或者
   把上期已经报过的事情换个说法再讲一遍 —— 那三种都是明确禁止的。
+- ⚠️ **板块一至板块四不写自家产品。** 华宝新能（Jackery）自己的产品动态
+  （Explorer、HomePower、SolarVault、FridgeGuard、SolarSaga 等）不要作为条目
+  收进板块一~四 —— 这几个板块是给读者看**别人在做什么**。自家产品只在板块五出现，
+  而且板块五写的是"对自家产品定义的启发"，**不是播报自家新品**。
 - 只写要求你写的板块，多一个少一个都不行。"""
 
 # 板块一的标题固定。两轮调用都要原样输出它，本地靠它定位这一块。
@@ -469,10 +475,12 @@ SECTION_FIVE_HEADING = SECTION_HEADINGS[-1]
 # 板块一的厂商范围与写作重点。第一轮与第二轮两个提示词共用。
 SECTION1_VENDORS = """\
    EcoFlow（正浩）、Anker SOLIX、BLUETTI（德兰明海）、DJI Power（大疆）、
-   Jackery（华宝新能）、Goal Zero、Segway、Oupes、Vtoman、Eco-Worthy 等的新品与形态变化。
-   **检索时用英文名**：EcoFlow / Anker SOLIX / BLUETTI / DJI Power / Jackery /
+   Goal Zero、Segway、Oupes、Vtoman、Eco-Worthy 等的新品与形态变化。
+   **检索时用英文名**：EcoFlow / Anker SOLIX / BLUETTI / DJI Power /
    Goal Zero / Segway / Oupes / Vtoman；阳台储能另有 Hoymiles、Zendure、
    Anker SOLIX Solarbank、PowerOak。
+   ⚠️ **Jackery（华宝新能）自己的产品刻意不在上面这份清单里，也不要补进来。**
+   板块一是给读者看**别人在做什么**；自家产品只在板块五出现。
    每条重点写：新品形态、体积/重量相对前代的变化%、防护等级、盲插/堆叠/无线连接架构、价格。
    用 `### 厂商 —— 一句话标题` 作为厂商小标题，**厂商名保留英文原文**。"""
 
