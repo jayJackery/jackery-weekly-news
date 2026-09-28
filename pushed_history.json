@@ -100,6 +100,79 @@
         "https://www.stocktitan.net/sec-filings/ASPN/8-k-aspen-aerogels-inc-reports-material-event-227a8e2b0c3a.html"
       ],
       "pushed": "2026-09-24"
+    },
+    {
+      "title": "Anker SOLIX —— S2000以约36%小型化切入室内型2kWh备电",
+      "urls": [
+        "https://prtimes.jp/main/html/rd/p/000000674.000016775.html",
+        "https://www.ankersolix.com/s2000"
+      ],
+      "pushed": "2026-09-28"
+    },
+    {
+      "title": "Jackery —— SolarVault 3由单机扩展至三机并联系统",
+      "urls": [
+        "https://finance.sina.com.cn/tech/roll/2026-09-08/doc-inirayqu9315262.shtml",
+        "https://m.ebrun.com/706639.html"
+      ],
+      "pushed": "2026-09-28"
+    },
+    {
+      "title": "DJI Power —— Power 2000接入微型逆变器，形成阳台光储系统",
+      "urls": [
+        "http://www.chinaden.cn/news_nr.asp?id=51416&Small_Class=3"
+      ],
+      "pushed": "2026-09-28"
+    },
+    {
+      "title": "Solar Solutions —— AEG 6 kWh采用IP66插接式户用电池",
+      "urls": [
+        "https://www.pv-magazine.com/2026/09/11/socket-to-the-sun/"
+      ],
+      "pushed": "2026-09-28"
+    },
+    {
+      "title": "Zendure —— SolarFlow Mix与PowerHub强化从阳台储能向整屋系统扩展",
+      "urls": [
+        "https://basic-tutorials.com/news/ifa-2026-zendure-unveils-agentic-hems-and-the-zen-home-ecosystem/",
+        "https://en.prnasia.com/releases/apac/zendure-introduces-agentic-hems-at-ifa-2026-the-home-energy-hub-of-the-ai-era--546356.shtml"
+      ],
+      "pushed": "2026-09-28"
+    },
+    {
+      "title": "Hoymiles —— HiBattery 4020 X确认兼容DC直连与AC耦合",
+      "urls": [
+        "https://www.hoymiles.com/awards/hibattery-4020-x-computer-bild-review.html"
+      ],
+      "pushed": "2026-09-28"
+    },
+    {
+      "title": "BYD —— GC Block把构网型储能的标准单元提升到电站级",
+      "urls": [
+        "https://www.pv-magazine.com/2026/09/16/byd-launches-62-mwh-gc-block-for-gigawatt-scale-battery-storage-plants/"
+      ],
+      "pushed": "2026-09-28"
+    },
+    {
+      "title": "Biwatt —— PowerLake I3以高压钠电平台切入工商业储能",
+      "urls": [
+        "https://www.pv-magazine.com/2026/09/15/biwatt-releases-sodium-ion-storage-system-for-ci-applications/"
+      ],
+      "pushed": "2026-09-28"
+    },
+    {
+      "title": "CBAK Energy —— 32140全极耳钠电芯将散热路径前移到电芯端部",
+      "urls": [
+        "https://www.globenewswire.com/news-release/2026/09/17/3364043/0/en/cbak-energy-reports-internal-sodium-ion-cell-test-results-and-outlines-12-gwh-capacity-plan.html"
+      ],
+      "pushed": "2026-09-28"
+    },
+    {
+      "title": "钠离子电芯安全窗口扩大，但不能取消热失控隔离",
+      "urls": [
+        "https://ces-ltd.com/in/sodium-ions-safety-breakthrough-the-battery-risk-equation-is-about-to-change/"
+      ],
+      "pushed": "2026-09-28"
     }
   ]
 }
