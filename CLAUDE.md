@@ -6,38 +6,60 @@
 
 华宝新能（Jackery）**储能结构工程师**的每周行业情报自动推送。
 
-每周一北京时间 09:00，GitHub Actions 运行 `main.py`：Tavily 中英双语检索 → DeepSeek 提炼归类
-→ 本地渲染 Markdown → 推送到钉钉群 → 更新去重台账。
+每周一北京时间 09:00，GitHub Actions 运行 `main.py`：经 **OpenRouter** 调用
+`perplexity/sonar-pro-search` 联网检索近 **14** 天全球储能硬件工程动态 →
+撰写成五个板块的 Markdown 周报 → 推送到钉钉群 → 把本期条目的链接回写台账并提交。
 
 ```
-Tavily 检索 → 归一化去重 → 剔除历史 → DeepSeek 提炼为 JSON → 校验 → Python 渲染 Markdown
-                                                                        → 钉钉推送 → 回写 history
+OpenRouter → perplexity/sonar-pro-search，共三次调用：
+        板块一 第一轮（检索预算全压竞品 + 上期标题清单）
+      → 过促销过滤器
+      → 板块一 第二轮（带上洗过的第一轮 + 促销黑名单 + 上期链接清单，补漏 + 合并）
+      → 板块二~五 一轮（把板块一当参考喂进去 + 上期标题清单）
+    ↓
+本地：剥标题 → 过促销过滤器 → 过跨周重复过滤器 → 校验五板块齐全且非空
+      → 校验关键词与链接 → 按 8KB 分段
+    ↓
+钉钉推送（每条都带 [行业资讯]）
+    ↓
+全部推送成功后：从**最终正文**抽条目 → 写 pushed_history.json → workflow 提交回仓库
 ```
+
+为什么板块一要单独跑两轮：五个板块挤在一次调用里会把检索预算摊薄，而板块一
+（便携与阳台储能竞品）恰恰最依赖英文检索，实测同一配置两次运行能差出 0 条 vs 2 条。
+拆开后实测 0 条 → 5~7 条。**改提示词时三个提示词要一起看**，别只改一个。
+
+**整个项目只有一个依赖：`requests`。** 检索与撰写都在模型侧完成，所以本地没有搜索引擎
+封装、没有"让模型返回 JSON 再本地渲染"那一套 —— 那是旧版（Tavily + DeepSeek 方案）的产物，
+已随重构移除，**不要重新引入**。**唯一的例外是跨周去重台账**（`pushed_history.json`），
+它是 2026-09 为配合窗口放宽到 14 天而加回来的，见下文「跨周去重」一节 ——
+**不要因为"旧版有个同名的 history_urls.json"就把它删掉**。
 
 ## 文件职责
 
 | 文件 | 职责 |
 |---|---|
 | `main.py` | 全部逻辑。单文件，未拆包 —— 项目规模不足以拆，单文件更便于直接读改 |
-| `history_urls.json` | 已推送 URL 台账。**只在成功推送后更新**，由 Actions 自动 commit 回仓库 |
+| `requirements.txt` | 只有 `requests` |
 | `Key` | 明文密钥文件。**只读，永不入仓，永不把内容打印或复制到任何地方** |
+| `example_report.md` | 排版参考样例 —— **一份真实产出的原文**（2026-09-24 那期，已被使用者接受）。调提示词时对照它的密度与层级：板块四必须是**短段落**、板块五必须是 **3 条 bullet**，都不是 `### ` 条目 |
+| `pushed_history.json` | 跨周去重台账。**由脚本自动回写、由 workflow 自动提交，不要手改** |
 | `.gitignore` | 挡住 `Key` / `.env` / `*.key` |
-| `.github/workflows/weekly_news.yml` | 定时任务 + 手动触发 + 回写台账 |
+| `.github/workflows/weekly.yml` | 定时任务 + 手动触发 + 回写台账 |
 | `README.md` | 面向同事的部署与使用说明 |
 
-`main.py` 内部分区（按文件顺序）：配置常量 → 环境变量校验 → URL 归一化 → history 读写
-→ Tavily 检索 → 大模型提炼 → Markdown 渲染 → 钉钉推送 → `main()` 主流程。
+`main.py` 内部分区（按文件顺序）：配置常量 → 促销词表 → **跨周台账** → 提示词 →
+环境变量校验 → OpenRouter 调用 → 正文校验与组装（含三个过滤器）→ 消息分段 →
+钉钉推送 → `main()` 主流程。
 
 ## 常用命令
 
 ```bash
 pip install -r requirements.txt
 
-python main.py --dry-run     # 只打印 Markdown，不推送钉钉、不写台账（推荐先用这个）
-python main.py --limit 2     # 只跑前 2 条查询，省额度、快
-python main.py               # 完整流程
-
-python main.py --dry-run --limit 1   # 最快的冒烟测试
+python main.py --dry-run              # 只打印 Markdown，不推送钉钉（推荐先用这个）
+python main.py --dry-run --out r.md   # 顺便存文件，便于在编辑器里细看
+python main.py                        # 完整流程
 ```
 
 看 Actions 日志：仓库页面 → Actions → Weekly Industry News → 选一次运行。
@@ -48,124 +70,204 @@ python main.py --dry-run --limit 1   # 最快的冒烟测试
 
 1. **`[行业资讯]` 必须留在 `markdown.text` 正文里。** 钉钉自定义关键词校验的是正文，
    官方文档从未说明 title 是否参与校验，社区反馈只放 title 会被 310000 拒收。
-   拆分成多条消息时，**每条都要带这个关键词**，否则第二条起全部被拦。
-2. **三个分类的名称与顺序固定**，改动需同步修改 `main.py` 顶部的 `CATEGORIES` 常量和 `SYSTEM_PROMPT`。
-3. **三个分类的渲染方式不同，不要图省事统一成一种**（`Digest` 的数据结构就为此分了叉）：
-   - 【竞品与市场动态】：逐条展开，每条 = 粗体标题 + `结构视角` + 原文链接。
-     `对标借鉴` 是**可选**的第二行：能对上华宝产品线就写对标 + 借鉴点（只能引用
-     `JACKERY_PRODUCTS` 里的产品线），对不上但行业形态变化对结构设计有普适启示就写宏观借鉴，
-     两者都不成立就留空 —— 渲染时该行自动消失。**不要为了让每条都齐整而强迫模型硬凑，
-     硬凑的对标比没有对标更糟。**
-   - 【结构、材料与防护技术】：逐条展开，每条 = 粗体标题 + `结构视角` + 原文链接。
-   - 【法规标准与出海动态】：**刻意不逐条列**，只渲染成**一整段综述**，底部最多挂
-     `MAX_REGULATION_SOURCES` 条溯源链接。这是使用者的明确要求 —— 他不会一条条点开法规新闻，
-     要的是"这周监管面变了什么、对我们意味着什么"。**不要"改进"成条目化列表。**
-4. **顶部要有"本周速览"**（`highlights`，三条一句话结论），分类标题要带条数。
-   整期偏长，速览是让读者能快速判断"这周值不值得细读"的唯一入口，去掉它读者就没耐心了。
-   **速览必须与正文一致**：`consistent_highlights()` 会把指向空小节的速览条目丢掉。
-   实测模型会写出「法规：欧洲多国放开阳台光伏」而正文法规综述返回空串 ——
-   速览承诺了、正文没有，读起来像坏了。**不要去掉这层过滤。**
-5. **`history_urls.json` 只在成功推送后更新**，且只记录**真正推送出去的** URL。
-   被模型丢弃、超出条数上限、或拆消息时被截断的链接都不能记 —— 否则它们下周不会再出现，
-   等于永久丢失。
-6. **fail-loudly**：任何异常都要非 0 退出，让 Actions 变红。宁可群里收不到消息、
+   **拆分成多条消息时，每条都要带这个关键词**，否则第二条起全部被拦。
+   `plan_messages()` 为此预留了前缀字节，`build_report()` 还会检查正文里有没有关键词、
+   缺了就补进标题 —— **这两层兜底都不要拆掉**，模型偶尔会忘。
+2. **五个板块的标题与顺序固定**，改动需同步修改三个提示词（`MAIN_SYSTEM_PROMPT` 管
+   板块二~五，`SECTION1_SYSTEM_PROMPT` / `SECTION1_MERGE_SYSTEM_PROMPT` 管板块一）
+   和 README 的板块表。三个提示词共用 `ROLE_AND_RULES`，改公共规则只改那一处。
+3. **分段必须按 UTF-8 字节数、且在行边界切。** 中文一字 3 字节，字符数 ≠ 字节数。
+   按字符切会超限，按字节硬切会劈开多字节字符，切断链接或表格。
+   `split_markdown()` 已处理这两种情况（`_cut_to_bytes` 按字符二分）。
+4. **fail-loudly**：任何异常都要非 0 退出，让 Actions 变红。宁可群里收不到消息、
    你去查日志，也不要静默失败导致几周后才发现。
-   **但要注意区分两种"空"**：模型输出结构损坏（`categories` 缺失/类型不对）是**真错误**，要退出码 1；
-   模型把全部候选判为无关是**合法结果**（检索命中一堆垃圾时就会这样），属于"本周无相关资讯"，
-   要发提示消息并以 0 退出。早期版本把后者也当错误，导致检索质量差的那周 Actions 无谓变红。
-   同理，法规综述里的"本期无"是提示词约定的占位词，`Digest.is_empty()` 要把这种
-   "形式上有字、实质没内容"的情况也判成空。
-7. **密钥只从环境变量读**，不得写进代码、注释、日志、异常信息或 README。
+5. **密钥只从环境变量读**，不得写进代码、注释、日志、异常信息或 README。
    `Key` 文件内容不得被读取后输出。
-8. **URL 白名单校验不能去掉**。模型会编造链接，`validate_digest()` 里的候选集比对是唯一的防线。
+6. **`load_config()` 里的 `DINGTALK_WEBHOOK` 格式校验不能去掉。** 它把"填成了飞书链接"
+   这类错误拦在启动时，而不是等推送时报一堆看不懂的错。
+7. **不要在提示词里放松"不许编造"的要求。** 这个方案里报告由模型直接撰写，
+   本地**没有 URL 白名单校验这一层防线**（旧版有，靠候选集比对）。所以提示词里
+   "只写真实动态、每条带原始链接、数据要精准、拿不准的数字宁可不写"是唯一的防线。
+   （促销过滤器是另一回事 —— 它只判断"这条讲的是不是卖多少钱"，**完全不校验数字真假**，
+   所以第 7 条的前提不变。）
+8. **促销/非新品过滤器不要拆掉，也不要放宽成子串匹配。** 见下节「促销稿」。
+9. **跨周台账的四个守卫一个都不能少**（都在 `drop_repeat_blocks` / `block_repeat_reason`
+   里，各有注释）。少任何一个都会**静默**造成内容丢失，而不是报错：
+   - **空链接列表守卫**（`if not urls: return None`）—— `all()` 对空列表恒为 True，
+     少了它所有**不带链接**的 `### ` 块会在第一次运行就被删光（r2/r3/r4/r7 里都有这种块）。
+   - **空板块守卫** —— 某板块条目被删光时整段恢复，否则会推出去一个只有标题的空壳。
+   - **聚合页排除**（`is_index_page_url`）—— 栏目页/标签页每周都出现，进台账后会把
+     引用它的所有条目永久误杀。
+   - **只剥跟踪参数，不剥整个 query** —— 整段丢弃会把 `?productId=UL2743` 和所有
+     UL 标准页塌成同一个键。
+   另外：**`## 五` 永久排除在删除之外**（它的链接天然是板块一的子集，任何够得着它的
+   删除都会把整个板块五删光），**台账只在全部消息推送成功之后写**，`--dry-run` 只读不写。
+10. **五个板块必须齐全且非空**（`_assert_all_sections`），缺了非 0 退出。放宽窗口 +
+    加去重之后正文变短，而被 `max_tokens` 截断的正好是末尾的板块四、五；不查会推出去
+    一份缺板块的报告且退出码为 0。
 
 ## 已知陷阱（踩过的坑，别再踩一遍）
 
-**Tavily**
-- **查询词写法对召回质量的影响极大，中文尤其明显。** 实测：关键词堆砌的长查询
-  （如"便携储能 户外电源 阳台储能 竞品 新品 结构 2026"）配 `topic="news"` 会返回
-  驱动之家日榜页、淘宝规则页甚至赌博站，基本不可用；改成自然语言的短查询
-  （"便携式储能电源 新品发布 行业动态"）配 `topic="general"` 后才稳定命中厂商新品、
-  专利、年报等有效信息。**改 `QUERIES` 后务必先 `--dry-run` 看实际召回质量，不要凭感觉写。**
-- **中文技术类查询要配 `include_domains` 定向行业媒体**，否则会跑偏到汽车、消费电子
-  等无关领域。定向清单见 `CN_INDUSTRY_DOMAINS`。
-- `include_domains` 的默认模式在 SDK 改版后**不再是"仅限这些域名"**，实测有时仍会返回
-  列表外的结果，不要把它当作强保证。
-- `days` 参数**已从全部现行官方文档移除**，但 SDK 签名里还留着 —— 传了可能被静默忽略，
-  导致"以为只取近 7 天、实际混进旧闻"。用 `time_range="week"`。
-- **API key 为 None 时不报错**：SDK 的 `MissingAPIKeyError` 定义了但源码中从未 raise，
-  实际会静默降级成匿名 keyless 模式，表现为一堆限流报错。所以 `load_config()` 里
-  必须显式校验非空。
-- `ForbiddenError` 和 `tavily.errors.TimeoutError` **不在 `tavily` 顶层导出**，
-  必须 `from tavily.errors import ...`。且它覆盖了内置 `TimeoutError`。
-- `results` 键永远存在（SDK 用 `setdefault` 兜底），但要按空列表处理。
-- `published_date` 是 beta 字段，可能为 `None`。
-- `timeout` 参数被 SDK 硬编码上限 120 秒（`min(timeout, 120)`），调大无效。
+**OpenRouter + Perplexity sonar**
+- **⚠️ 最大的行为回退：`search_recency_filter` 用不了。** 它是 Perplexity **原生**接口的参数，
+  OpenRouter 的 `perplexity/sonar-pro-search` 不支持。2026-09-24 实测该模型
+  `supported_parameters` 只有：`frequency_penalty, include_reasoning, max_tokens,
+  presence_penalty, reasoning, structured_outputs, temperature, top_k, top_p,
+  web_search_options`。**`search_recency_filter` 和 `return_citations` 都不在里面。**
+  所以"只取近 N 天"**完全靠提示词约束**（`_window()` 给日期区间 + `ROLE_AND_RULES`
+  要求"只写近 N 天"），**没有 API 层的硬保证**，偶尔混进旧闻是已知行为。
+  想恢复硬保证就得换回原生接口 `https://api.perplexity.ai/chat/completions`。
+  查支持参数的只读方法：`GET https://openrouter.ai/api/v1/models`（无需鉴权）。
+- **⚠️ 窗口从 7 天放宽到 14 天，不是为了让报告更长，而是为了让模型待在窗内。**
+  7 天太窄：五个板块摊薄检索预算后经常凑不满，模型就往窗口外找 —— 那才是"报告里混进
+  九月初事件"的真正原因，不是检索不听话。**当前是 `WINDOW_DAYS = 14`。**
+  窗口只有**一个**定义源（`_window()`），但"近 N 天"这五个字曾经**硬编码在 6 个提示词
+  字符串**里，另外 header 里还有第二处 `timedelta(days=7)` 绕过了 `_window()`。
+  只改常量不改措辞的后果很具体：提示词会写成"2026-09-10 至 2026-09-24（近 7 天）"，
+  而模型会听那个更简单、重复了四遍的数字，同时 header 印的覆盖周期是假的。
+  **改窗口时六处措辞 + `_window()` 要一起改**，全部用 `f"近 {WINDOW_DAYS} 天"` 插值。
+- **查参数时以 `/models` 的 `supported_parameters` 为准，不要照着 Perplexity 官方文档写。**
+  两边的参数集不重合，传了不支持的参数会被忽略甚至 400。
+- **`max_tokens` 必须显式给足。** 该模型 `max_completion_tokens` 上限 8000，
+  现在是 `OPENROUTER_MAX_TOKENS = 8000`（**给满**：14 天窗口 + 台账提示词之后，
+  7 天时代实测就已到 6000 的 83%，留余量会把末尾的板块四、五截掉）。
+- **⚠️ 截断是静默的。** `call_openrouter` 只看 `content`，从不看 `finish_reason` ——
+  这是 2026-09 才补上的：现在 `finish_reason == "length"` 会打一条 WARNING。
+  加上 `_assert_all_sections` 的板块齐全校验，两道合起来才能定位"报告变薄"是截断
+  还是检索没找到东西。**不要删掉这两个检查。**
+- **`web_search_options: {"search_context_size": "high"}` 是目前唯一可用的检索侧开关。**
+  它是 `search_recency_filter` 的替代品（控制检索上下文量，不控制时间窗）。
+- **OpenRouter 的 `HTTP-Referer` / `X-Title` 头**是非必填的应用标识，用于它的排行榜区分调用方。
+  带上是规范做法，不带也能跑。
+- **错误码分三类，别混为一谈**：`401/403` = key 无效；**`402` = 余额不足**（不是 key 问题）；
+  `400` = 模型名不存在或参数不合法。代码对非 200 的 4xx 直接退出（重试没意义）并把响应体带出来。
+  另外**上游错误可能藏在 HTTP 200 的响应体里** —— `choices` 缺失时先看顶层 `error` 字段。
+- **响应里没有 `citations` 也能正常出报告。** 引用改由 `extract_citations()` 从三种可能位置
+  尽力提取（顶层 `citations` / `message.annotations` 里的 `url_citation` / `message.citations`）。
+  只在**正文一个 Markdown 链接都没有**时才拿它补一段「参考来源」—— 那是兜底，不是常态路径。
+- **联网检索＋长文撰写很慢**，超时给到 300 秒。别按普通 chat 接口的 30 秒去设。
+- **429 与 5xx 值得重试，4xx 其余情况不值得**，见上面的错误码分类。
 
 **钉钉**
 - **限流错误码是 `410100`**（不是常见的 130101 猜测）。官方限制每机器人 20 条/分钟，
-  **超限直接封 10 分钟**，不是简单丢弃。
+  **超限直接封 10 分钟**，不是简单丢弃 —— 所以代码遇到 410100 直接退出，不重试。
 - **`310000` 是合并安全错误码**：关键词不匹配 / timestamp 无效 / 签名不匹配 / IP 不在白名单
   四种失败共用它，靠 `errmsg` 区分。日志必须打 errmsg。
 - **正文长度上限官方没有任何明文规定**（流传的 20000 字节查无出处）。所以按 UTF-8 字节数
-  主动截断到 8KB，不赌这个数字。注意中文一字 3 字节，字符数 ≠ 字节数。
+  主动截断到 8KB，不赌这个数字。
 - **HTTP 200 不代表成功**，必须检查 `errcode == 0`（值可能是字符串 `"0"`，用 `int()` 转）。
 - GitHub 托管 runner 出口 IP 不固定（`api.github.com/meta` 有 7000+ 个 CIDR 段），
   **IP 白名单模式不可用**，只能用自定义关键词或加签。本项目用关键词。
 
 **GitHub Actions**
-- cron 是 **UTC**。`0 1 * * 0` = 北京周一 09:00。
-- **`permissions:` 一旦声明，未列出的 scope 全部变 `none`**，`contents: write` 必须显式写。
-- `actions/checkout` 的 `persist-credentials` **默认 `true`**，正是为 push 设计的，
-  改成 `false` 反而推不上去。
-- **`GITHUB_TOKEN` 无权修改 `.github/workflows/` 下的文件**，所以只回写 `history_urls.json`，
-  不要让脚本尝试改 workflow 自身。
+- cron 是 **UTC**。`0 1 * * 1` = 北京周一 09:00。
+  ⚠️ 旧版写的是 `0 1 * * 0` —— **`0` 是周日，实际会在北京周日 09:00 触发**，
+  而当时的 README 和 CLAUDE.md 都误写成"周一"。改成 `1` 才是真的周一。
 - `actions/setup-python@v7` **移除了 `pip-install` input**，依赖用独立的 `pip install` 步骤。
 - 整点是 GitHub Actions 的高负载时段，定时任务可能被延迟或丢弃。若推送时间不稳定，
   把 cron 分钟位从 `0` 改成 `7`。
+- **`permissions:` 一旦声明，未列出的 scope 全部变 `none`。** 现在工作流要回写台账，
+  所以声明了 `permissions: contents: write`。**但它可能被仓库设置夹掉**：
+  Settings → Actions → General → Workflow permissions 若是
+  "Read repository contents permission"，YAML 里的 `contents: write` 会被忽略，
+  `git push` 403 —— 修法在仓库设置里，不在代码里（README 有写）。**这是最容易被
+  当成"脚本 bug"排查半天的一类故障。**
+- **提交步骤绝不能加 `if: always()`。** 旧版 `weekly_news.yml` 加了，意味着推送失败时
+  也提交台账，把从没送达读者的条目标成"已推送" → 下周被永久压制。这是静默丢内容。
+- **`git add` 只能加 `pushed_history.json` 这一个路径**，绝不用 `git add -A` / `git add .`。
+  `Key` 就躺在工作区里（虽被 gitignore 挡住），这是安全边界。提交前有一道断言：
+  `git diff --staged --name-only` 必须恰好是这一个路径，否则硬失败。
+- **`cancel-in-progress` 必须是 `false`。** 设成 `true` 会在"消息已发出、台账还没提交"
+  的窗口里取消这次运行，那一期的记录就丢了。
+- `actions/checkout` 要带 `fetch-depth: 0` —— 提交步骤要 rebase 到远端，浅克隆下不可靠。
+- **`pushed_history.json` 必须先在仓库里存在**（哪怕只有 `{"version": 1, "entries": []}`）。
+  否则 `git add pushed_history.json` 会以非 0 退出，workflow 每周变红。
+- workflow 文件名是 `weekly.yml`。**旧版叫 `weekly_news.yml`，已删除** ——
+  两个工作流并存会导致每周推送两次。
+  ⚠️ `weekly.yml` 曾长期**未被 git 跟踪**（`?? .github/`）。用 `git commit -a` 提交时
+  **不会带上它**，仓库里会出现"一个 workflow 都没有"的状态 —— 机器人静默永不运行，
+  这是最长时间无人察觉的失败模式。改动 workflow 后务必确认它进了提交。
 
-**大模型**
-- **`deepseek-chat` 这个模型 id 已经失效**（2026-09 实测该端点只提供 `deepseek-flash` 和
-  `deepseek-v4-pro`）。默认值定为 `deepseek-flash`。改 `OPENAI_MODEL` 前先调
-  `/models` 端点确认 id 还在，否则每次调用都会失败。
-- DeepSeek **只支持 `response_format={"type":"json_object"}`，不支持 `json_schema`**。
-- 第三方网关有**静默丢弃 `response_format`** 的已知问题，所以提示词里必须写明 JSON 结构，
-  且解析、字段校验、URL 白名单校验三道防线都不能省。
-- 提示词里必须**出现 "json" 字样**，否则部分网关直接报
-  `messages must contain the word 'json'`。
-- **提示词拦不住促销稿，必须靠 `JUNK_URL_SEGMENTS` 在 Python 里硬拦。** 实测提示词里
-  明写"纯折扣稿一律丢弃"，模型仍会把 `cnet.com/deals/ecoflow-early-prime-day-deals`
-  包装成一条像模像样的"可插拔电池模组"解读混进来。URL 路径特征比语义判断可靠得多。
-  **改 `JUNK_URL_SEGMENTS` 时注意用路径分段匹配而不是子串匹配**，否则 `/wholesale-...`
-  这类正常路径会被误伤。
-- **但这份清单只该收促销页和聚合页，往里加厂商产品页会误伤真实情报。** 踩过的坑：
-  曾经把 `/downloads/`、`/products/` 也加进去，结果那一周唯一一条大疆新品
-  （`dji.com/cn/downloads/products/power-auro-2000-elite`）被拦掉了，
-  使用者立刻发现"大疆的资讯怎么没了"。厂商自营页交给提示词判断就好。
-- **Tavily 召回不稳定**：同一个查询词，连续几次运行返回的候选集并不一致
-  （实测同一查询三次分别命中 39 / 34 / 34 条）。所以"这周少了某条"未必是代码问题，
-  先看日志里候选数是否变化，不要急着改过滤规则。
-- **模型的输出前后会打架**：速览里写了某分类的结论，该分类正文却返回空。
-  速度 0.3 仍会复现。靠 `consistent_highlights()` 兜底，别指望提示词能约束住。
-- `OpenAI()` 默认超时 10 分钟、自动重试 2 次，最坏能卡 30 分钟。已显式设成
-  `timeout=60.0, max_retries=2`。
+**促销稿混进竞品动态（踩过两次，第二次是 OpenRouter 方案下的）**
+- **症状**：板块一里出现"XX 厂商 —— 进入上市促销 / 限时优惠"，容量和价格都是真数字，
+  看起来像新品动态，实际原文只在打折。
+- **提示词拦不住，实测两轮**。2026-09-24 那次板块一 7 条里有 3 条是 Electrek 折扣稿。
+  模型自己在正文里都写了"该条信息属于销售活动……因此不将其作为新品或结构改款处理"，
+  **却仍然把这一条留在了板块一** —— 因为容量和价格是真的，它不认为自己编造了。
+  旧版（Tavily 方案）踩的是同一个坑，最后也是靠 Python 侧的 URL 过滤才解决。
+- **现在有两道，都在 `drop_promo_blocks()` 里，命中任一即整条删除**：
+  1. **模型自己的否定式自述**（`SELF_DISQUALIFY_RE`）—— 主判据。它都写了
+     "不将其作为新品处理"，这条就不该占一个条目。实测 r7 的 Anker SOLIX 那条
+     **只有这道能拦住**（它的 URL 里没有 sale/deal）。
+  2. **URL 命中促销特征**（`url_promo_reason()`）—— 补充。用于模型直接当新品写出来的情况。
+- **URL 匹配是按「路径分段 → 段内再按 `-` `_` 切词」逐词比对，刻意不做子串匹配。**
+  旧版 `JUNK_URL_SEGMENTS` 用子串匹配误伤过大疆唯一的新品。
+  只匹配路径**不匹配域名** —— 9to5Toys 这类站偏导购，但它的新品报道是有效情报。
+- **⚠️ `off` 不能单独进 `PROMO_URL_TOKENS`**：`off-grid`（离网）是本领域核心词，
+  实测 `bluetti-balco-500-off-grid`、`dji-power-2000-off-grid-power-station` 的
+  `500-off` / `2000-off` 会被当成"打五折"。`PROMO_OFF_RE` 末尾的 `(?!-?[a-z])`
+  就是为这个加的 —— 要求 `off` 后面不再接连字符复合词。代价是漏掉
+  `30-off-anker-solix` 这种写法，但这类 slug 通常用 `-deal` / `-sale`，词表能兜住。
+- **`exclusive` 是其中最激进的一个词**，理论上会误伤"独家首曝"类报道。
+  保留它是因为 Electrek 的折扣稿大量用它。**每次剔除都在日志里留一行 WARNING**，
+  误伤时按日志把那一个词从常量里摘掉即可 —— 词表集中在文件顶部，一个动作就能回退。
+- **只删 `### ` 条目块，不动 `## ` 标题行与段落**：标题是本地用来定位板块的，删了层级会塌；
+  段落删了会连带丢掉同段里的真情报。所以非 `### ` 块里若命中，只打 WARNING 交人工确认。
+- **验证方法（不花 API 额度）**：把历史报告喂给 `drop_promo_blocks()` 重放，看它剔除几条。
+  实测 r7.md → 剔除 3 条（2 条 URL、1 条自述），r8.md → 剔除 0 条。
+
+**跨周去重（2026-09 加回来的，别当成回归删掉）**
+- **为什么加回来**：窗口从 7 天放宽到 14 天后，下周的窗口会**完整覆盖**本周报过的内容，
+  不建台账必然整期重复。这是放宽窗口的配套条件，不是可选项。
+- **旧版的教训**：旧版有个 `history_urls.json`，但复盘 `git show 8310b91:history_urls.json`
+  会发现它**自始至终是空的**（`{"updated_at": "", "urls": {}}`）—— 那套去重从来没真正生效过，
+  而且没人发现。所以这次的设计里**读失败一律非 0 退出，绝不 `except: entries = []`**：
+  静默失效的去重和没有去重，表现上完全一样。
+- **新文件名 `pushed_history.json`，刻意不复用旧名** —— 旧名在 index 里是 staged deletion，
+  且 schema 不同，复用名字会让"又是那个从来是空的文件"的联想挥之不去。
+- **三道，从软到硬**：
+  1. **提示词里列上期标题**（主机制，注入三个 user 提示词）。**台账为空时整块省略**，
+     不要渲染成 `（无）`—— 模型可能把"无"当成一条指令。措辞必须包含"换来源换链接也算重复"
+     和"只有新进展才值得再写、且要引新链接"。
+  2. **第二轮拿到 seen-URL 集合**（`_seen_url_block`）。**它和促销黑名单是两段、
+     两套措辞、两个独立参数，绝不能合并** —— 合并会让模型把上期的真新闻当成折扣稿，
+     连带躲开整个域名。
+  3. **代码硬兜底**（`drop_repeat_blocks`）：块的全部链接（归一化后）都在台账里 → 整块删。
+     四个守卫见「硬性约束 9」。
+- **代码兜底的覆盖面只到板块一、二（板块三有时，它是否用 `### ` 格式像钟摆）。**
+  板块四是短段落、板块五从来没 `### ` 块，代码够不着，**纯靠提示词**，只对命中打 WARNING。
+  别以为全覆盖了。`## 四` 是实际重复风险最高的一块 —— `r7.md` 里模型自己写了
+  "该信息发表于本周期之前……不作为本周新增政策事件"**却仍然收进了报告**，
+  和促销稿那个"先写再补免责"的模式一模一样。
+  **最便宜的根因解法是要求板块四条目必须带明确日期**，再据此丢弃窗口外的条目 ——
+  这同时直接回应"时效性"的抱怨。**尚未做，建议作为下一步。**
+- **空板块守卫让单条目板块永远删不掉**：某板块条目被删光时整段恢复（重复好过推空壳）。
+  实测 r8.md 自洽重放（台账 = r8 自己的条目）→ **剔除 0 条**，因为每个板块都被恢复；
+  给板块二加一条新动态后 → 剔除 3 条，板块一、三（全是重复）仍被恢复。**这是设计如此。**
+- **去重严格度只按 URL 判**，不做标题模糊匹配。换来源的同一事件交给第 1 道软性拦。
+
+**方案本身**
+- **报告由模型直接写 Markdown，格式稳定性靠提示词。** 旧版是"模型输出 JSON + Python 渲染"，
+  格式更稳但结构死板。现在为了那份分层排版放弃了这层保证 —— 若发现格式飘移，
+  优先在 `MAIN_SYSTEM_PROMPT` 里加格式要求（并对照 `example_report.md`），而不是退回 JSON 方案。
+- **模型的检索结果同样不稳定**，同一个提问每次召回的新闻不完全一样。
+  所以"这周少了某条"未必是代码问题。
 
 ## 改动指南
 
 | 想做什么 | 改哪里 |
 |---|---|
-| 增删搜索词 | `main.py` 顶部 `QUERIES`（**改完先 `--dry-run` 验召回质量**） |
-| 屏蔽垃圾/社交站点 | `EXCLUDE_DOMAINS` |
-| 屏蔽促销页/店铺页/下载页 | `JUNK_URL_SEGMENTS`（**按路径分段匹配，别改成子串匹配**） |
-| 调整中文技术查询的定向媒体 | `CN_INDUSTRY_DOMAINS` |
-| 调整每个分类的收录条数 | `MAX_ITEMS_PER_CATEGORY`（**法规类没有条数概念，它是一段话**） |
-| 调整法规综述底部的链接条数 | `MAX_REGULATION_SOURCES` |
-| 改"对标借鉴"能引用的产品线 | `JACKERY_PRODUCTS`（**产品线变动时必须同步，否则对标会失准**） |
-| 改变分类口径 | `CATEGORIES` + `SYSTEM_PROMPT` 里的边界描述（两处要一致） |
-| 改速览/分类标题的排版 | `render_header` / `render_section` / `render_regulation` |
-| 换模型 | 环境变量 `OPENAI_MODEL`，不用改代码 |
-| 调整单条消息长度上限 | `MAX_MESSAGE_BYTES` |
-| 改推送时间 | `.github/workflows/weekly_news.yml` 的 cron（**记得算 UTC**） |
+| 改检索重点 / 板块口径 / 写作风格 | `ROLE_AND_RULES`（三个提示词共用）；只涉及板块一的改 `SECTION1_*`（**改完先 `--dry-run` 看实际输出**） |
+| 改促销稿过滤规则 | `PROMO_URL_TOKENS` / `PROMO_URL_PHRASES` / `PROMO_OFF_RE` / `SELF_DISQUALIFY_RE`（**都在文件顶部，一个动作就能回退；改完拿历史报告重放验证，不花额度**） |
+| 改第五板块能引用的华宝产品线 | `JACKERY_PRODUCTS`（**产品线变动时必须同步，否则建议会失准**） |
+| 换模型 | 环境变量 `OPENROUTER_MODEL`，不用改代码 |
+| 调温度 / 正文长度上限 | `OPENROUTER_TEMPERATURE` / `OPENROUTER_MAX_TOKENS`（**模块常量，不是环境变量**） |
+| 改检索时间窗 | `WINDOW_DAYS` + `_window()` + **六处 `近 N 天` 措辞**（**没有 API 层开关**，见上文陷阱） |
+| 改跨周去重规则 | `HISTORY_KEEP_DAYS` / `TRACKING_QUERY_KEYS` / `INDEX_PATH_SEGMENTS` / `drop_repeat_blocks`（**四个守卫一个都不能少，见硬性约束 9**） |
+| 台账崩了 / 想手工重置 | `pushed_history.json`（**正常不要手改**；`version` 不符或 JSON 坏掉会非 0 退出，这是刻意的） |
+| 改单条消息字节上限 | `MAX_MESSAGE_BYTES`（**注意 `plan_messages` 会预留前缀字节**） |
+| 改多消息间隔 | `MESSAGE_INTERVAL`（**别低于 3 秒，20 条/分钟超限封 10 分钟**） |
+| 改推送时间 | `.github/workflows/weekly.yml` 的 cron（**记得算 UTC**） |
 
 ## 密钥
 
@@ -174,5 +276,8 @@ python main.py --dry-run --limit 1   # 最快的冒烟测试
 - **不要读 `Key` 的内容并输出**，除非用户明确要求且确有必要。
 - **不要把 `Key` 的任何内容写进代码、README、CLAUDE.md、日志或 commit message。**
 - 本地跑脚本需要把这些值导入环境变量，例如（在 bash 里逐条 `export`，不要落盘成脚本文件）。
-- 新增环境变量的流程：`main.py` 的 `load_config()` → workflow 的 `env:` → README 的 Secrets 表，
+- 本项目需要两个变量：`OPENROUTER_API_KEY`（`sk-or-v1-` 开头）与 `DINGTALK_WEBHOOK`。
+  `load_config()` 按 `OPENROUTER_API_KEY` → `PERPLEXITY_API_KEY` 的顺序回退，
+  旧的 `PERPLEXITY_API_KEY`（`pplx-` 开头）仍能用 —— 这是**刻意的兼容**，不要删掉回退。
+  新增环境变量的流程：`main.py` 的 `load_config()` → workflow 的 `env:` → README 的 Secrets 表，
   三处都要同步。

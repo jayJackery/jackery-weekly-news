@@ -1,0 +1,109 @@
+name: Weekly Industry News
+
+on:
+  schedule:
+    # cron 用的是 UTC。UTC 周一 01:00 = 北京时间周一 09:00（中国无夏令时）。
+    - cron: '0 1 * * 1'
+  workflow_dispatch:        # 手动触发（Run workflow 按钮）
+
+# ⚠️ 一旦声明 permissions，未列出的 scope 全部变 none。这里要写仓库是因为
+# 推送成功之后要把跨周台账 pushed_history.json 提交回去（见最后一步）。
+# 若仓库的 Settings → Actions → General → Workflow permissions 被设成
+# Read repository contents permission，YAML 里的 contents: write 会被**夹掉**，
+# git push 会 403 —— 修法在仓库设置里，不在这个文件里（README 有写）。
+permissions:
+  contents: write
+
+# 同一时间只允许一次运行。cancel-in-progress 必须是 false：
+# true 会在"消息已发出、台账还没提交"的窗口里把这次运行取消掉，那一期的记录就丢了。
+concurrency:
+  group: weekly-news
+  cancel-in-progress: false
+
+jobs:
+  push-news:
+    runs-on: ubuntu-latest
+    # 窗口放宽到 14 天后正文变长、消息条数变多，20 分钟偏紧。
+    timeout-minutes: 30
+    steps:
+      # fetch-depth: 0 —— 最后一步要 rebase 到远端分支，浅克隆下 rebase 不可靠。
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Guard - 确认密钥文件未被跟踪
+        run: |
+          if git ls-files --error-unmatch Key >/dev/null 2>&1; then
+            echo "::error::Key 文件被 git 跟踪，存在密钥泄露风险，已中止"; exit 1
+          fi
+
+      # setup-python@v7 移除了 pip-install input，依赖要单独装。
+      - run: pip install -r requirements.txt
+
+      - name: Run news bot
+        env:
+          # 主用 OPENROUTER_API_KEY。旧名 PERPLEXITY_API_KEY 一并传入是为了兼容 ——
+          # 若仓库里只配了旧名，前者会是空串，main.py 的 load_config() 会回退到后者。
+          # 没配的那个 Secret 展开成空串，不会报错。
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+        run: python main.py
+
+      # ⚠️ 这一步**故意不加 `if: always()`**。旧版（weekly_news.yml）加了，意味着
+      # 推送失败时也提交台账，把从没送达读者的条目标成"已推送" → 下周被永久压制。
+      # 没有 always()，上面任何一步失败都会跳过这里，那一期下周会重发一遍 —— 重复
+      # 一期，总好过静默丢一条。
+      #
+      # 走到这一步意味着 python main.py 已成功退出，而 main.py 只在**全部消息推送
+      # 成功之后**才写台账，所以这里的文件就是权威记录。
+      - name: Commit history ledger
+        run: |
+          set -euo pipefail
+
+          if [ ! -f pushed_history.json ]; then
+            echo "::error::main.py 成功退出却没有生成 pushed_history.json，行为异常，已中止"
+            exit 1
+          fi
+          if git diff --quiet -- pushed_history.json; then
+            echo "台账无变化（本期没有新增条目），跳过提交"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # ⚠️ 只 add 这一个文件。绝不用 `git add -A` / `git add .` —— 工作区里
+          # 躺着明文密钥文件 Key（虽然被 .gitignore 挡住）。这是安全边界，不是风格偏好。
+          git add pushed_history.json
+
+          # 断言：暂存区里必须恰好是这一个路径。多出任何一个都硬失败 ——
+          # 与其把不该提交的东西推上去，不如让 job 变红让人来看。
+          staged="$(git diff --staged --name-only)"
+          if [ "$staged" != "pushed_history.json" ]; then
+            echo "::error::暂存区内容异常，只应包含 pushed_history.json，实际为："
+            echo "$staged"
+            exit 1
+          fi
+
+          git commit -m "chore: update pushed_history.json [skip ci]"
+
+          # 竞态：定时任务与手动触发可能撞上，期间远端可能已有新提交。
+          # rebase 后再推，失败退避重试 3 次。
+          for attempt in 1 2 3; do
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase "origin/${GITHUB_REF_NAME}"
+            # 用 HEAD:refs/heads/... —— 不写死 main，且 detached HEAD 下也对。
+            if git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"; then
+              echo "台账已提交（第 ${attempt} 次尝试）"
+              exit 0
+            fi
+            echo "推送失败，10 秒后重试（第 ${attempt} 次）"
+            sleep 10
+          done
+          echo "::error::台账推送连续 3 次失败。消息已发出，但台账没落库 —— 下周会重复一期。"
+          exit 1

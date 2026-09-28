@@ -2,13 +2,15 @@
 # -*- coding: utf-8 -*-
 """华宝新能（Jackery）储能结构工程师 · 每周行业资讯推送
 
-流程：Tavily 中英双语检索 → DeepSeek 提炼为分类 JSON → 本地渲染 Markdown
-      → 钉钉推送 → 记录已推送 URL
+流程：OpenRouter（perplexity/sonar-pro-search）联网检索并撰写 → 本地校验与分段 → 推送钉钉群。
+
+OpenRouter 上的 sonar 系列本身就会联网检索，检索与撰写在一次调用里完成，
+所以本地不再做搜索、去重台账或大模型二次提炼 —— 那些逻辑随旧方案一并移除。
 
 用法：
     python main.py                # 完整流程
-    python main.py --dry-run      # 只打印 Markdown，不推送钉钉、不写 history
-    python main.py --limit 2      # 只跑前 2 条查询，快速验证
+    python main.py --dry-run      # 只打印 Markdown，不推送钉钉
+    python main.py --out r.md     # 额外把原文存成文件，便于先审阅再发
 
 环境变量见 README.md。任何异常都会以非 0 退出码结束，以便 GitHub Actions 变红告警。
 """
@@ -22,26 +24,14 @@ import os
 import re
 import sys
 import time
-import uuid
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 try:
     import requests
 except ImportError:
     sys.exit("缺少依赖：requests。请先执行 pip install -r requirements.txt")
-
-try:
-    from tavily import TavilyClient
-except ImportError:
-    sys.exit("缺少依赖：tavily-python。请先执行 pip install -r requirements.txt")
-
-try:
-    from openai import OpenAI
-except ImportError:
-    sys.exit("缺少依赖：openai。请先执行 pip install -r requirements.txt")
 
 # ---------------------------------------------------------------------------
 # 配置
@@ -49,137 +39,659 @@ except ImportError:
 
 BEIJING_TZ = timezone(timedelta(hours=8))
 
-HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "history_urls.json")
+# 检索时间窗。
+#
+# ⚠️ **改这个数字时，必须确认全文件的"近 N 天"都跟着变了。** 日期区间由 `_window()` 算，
+# 但"N 天"这五个字是硬编码在提示词里的 —— 只改常量会让提示词自相矛盾
+# （例如"请检索并汇总 09-10 至 09-24（近 7 天）"），而模型会听那个更简单、重复更多遍的数字。
+# 所以下面每一处措辞都用 f-string 插值这个常量，不要再写死。
+#
+# 为什么是 14 而不是 7：7 天太窄，五个板块摊薄检索预算后经常凑不满，模型就会往窗口外找
+# 九月初的旧闻 —— 使用者反馈的"时效性"问题根因在这里。放宽到两周后它反而守得住。
+# 代价是下周的窗口会覆盖本周报过的内容，所以必须配合跨周台账一起上（见下）。
+WINDOW_DAYS = 14
 
-# 钉钉自定义关键词。必须出现在 markdown.text 正文里，否则钉钉会以 310000 拒收。
+# ---------------------------------------------------------------------------
+# 跨周台账：记录"已经推送给读者"的条目，下周不让它再出现
+# ---------------------------------------------------------------------------
+# 为什么需要它：窗口放宽到 14 天后，下周的检索窗口会**完整覆盖**本周报过的内容，
+# 不去重的话读者会连续两周看到同一批新闻。
+#
+# 为什么不复用旧版的 history_urls.json：那个文件（见 git show 8310b91:history_urls.json）
+# **自始至终是空的**（`{"updated_at": "", "urls": {}}`）—— 旧版那套去重从来没真正生效过。
+# 而且它的 schema 依赖 Tavily 的结果结构。所以这里是一个新文件、新 schema，
+# 唯一沿用旧版的只有"由 workflow 回写仓库"这个思路。
+HISTORY_PATH = Path(__file__).resolve().parent / "pushed_history.json"
+HISTORY_VERSION = 1
+# 保留期 60 天，比 14 天窗口宽得多 —— 因为真正的约束不是窗口，而是**模型的回溯范围没有上限**
+# （见 CLAUDE.md：时间窗只有提示词约束，它时不时会把三周前的东西翻出来）。
+# 保留久一点只会多拦，不会漏拦；条数上限兜住提示词长度。
+HISTORY_KEEP_DAYS = 60
+HISTORY_MAX_ENTRIES = 200
+
+# 归一化 URL 时要剥掉的跟踪参数。**只剥这些，不要剥掉整个 query** —— 剥整段会把
+# `shopulstandards.com/ProductDetail.aspx?productId=UL2743` 和同站其它页面塌成同一个键，
+# 把"漏去重"（无害）变成"错去重"（静默丢真情报）。
+TRACKING_QUERY_KEYS = frozenset({
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "utm_id",
+    "spm", "from", "ref", "referrer", "commtag", "src", "fbclid", "gclid",
+    "mc_cid", "mc_eid", "share_source", "share_medium", "share_plat", "share_token",
+})
+
+# 栏目页/聚合页的路径段与查询参数。这类页面在报告里反复出现且内容每周都在变，
+# 一旦进台账就成了一个"稳定键"，会误杀未来所有引用它的条目。
+# 判据与 ROLE_AND_RULES 里禁止引用的那几种形状保持一致。
+INDEX_PATH_SEGMENTS = frozenset({
+    "category", "categories", "tag", "tags", "subject", "subjects",
+    "industry-updates", "topic", "topics", "channel", "channels",
+    "newslist", "list", "archive", "search", "author", "column",
+})
+INDEX_QUERY_KEYS = frozenset({"column_id", "cat_id", "category_id", "tag_id", "columnid"})
+
+# 钉钉自定义机器人的安全关键词校验的是 markdown.text 正文。
+# 官方文档从未说明 title 是否参与校验，社区反馈只放 title 会被 310000 拒收，
+# 所以这个关键词必须出现在正文里，且**拆分出的每条消息都要带**。
 DINGTALK_KEYWORD = "[行业资讯]"
 
-# 三个分类。名称与顺序固定，改动时需同步修改 SYSTEM_PROMPT。
-CATEGORY_COMPETITOR = "竞品与市场动态"
-CATEGORY_STRUCTURE = "结构、材料与防护技术"
-CATEGORY_REGULATION = "法规标准与出海动态"
-CATEGORIES = [CATEGORY_COMPETITOR, CATEGORY_STRUCTURE, CATEGORY_REGULATION]
-
-# 华宝新能 / Jackery 在售产品线，供模型在竞品分类里做"对标 + 借鉴点"。
+# 经 OpenRouter 接入 Perplexity 的 sonar-pro-search。
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_URL = f"{OPENROUTER_BASE_URL}/chat/completions"
+OPENROUTER_MODEL = "perplexity/sonar-pro-search"
+# 0.2 而非 0：报告需要一定的组织语言自由度，但检索与数据事实必须可复现。
+OPENROUTER_TEMPERATURE = 0.2
+# 该模型的 max_completion_tokens 上限是 8000（查 /models 得到）。**直接给满**：
+# 窗口从 7 天放宽到 14 天、又加了台账提示词之后，实测 r3.md 时代就已经到 6000 的 83%，
+# 留余量反而会把末尾的板块四、五截掉 —— 而截断是静默的（只看 content 看不出来）。
+# 配套措施：call_openrouter 在 finish_reason=length 时打 WARNING。
+OPENROUTER_MAX_TOKENS = 8000
+# OpenRouter 要求的调用方标识，用于在它的排行榜/日志里区分应用。非必填但建议带上。
+OPENROUTER_REFERER = "https://github.com"
+OPENROUTER_TITLE = "Storage Weekly Bot"
 #
-# ⚠️ 这份清单需要你按实际情况维护。模型被要求**只能引用这里列出的产品线**，
-#    清单外的型号它不应编造。产品线有变动（新系列上市、老系列停产）时记得同步这里，
-#    否则周报里的"对标"会失准。
-#    下面括号里的型号来自自动化检索命中，未逐一核实，请以实际在售为准。
+# ⚠️ 这里**没有** search_recency_filter —— 该参数是 Perplexity 原生接口的，
+# OpenRouter 的 perplexity/sonar-pro-search 不支持（查 /models 的 supported_parameters
+# 只有 frequency_penalty / include_reasoning / max_tokens / presence_penalty /
+# reasoning / structured_outputs / temperature / top_k / top_p / web_search_options）。
+# 传了会被忽略甚至报错，所以"只取近 N 天"现在**完全靠提示词约束**（见 _window 与
+# build_user_prompt），不再有 API 层的硬保证 —— 跨周台账就是为这个不确定性兜底的。
+# 同理 return_citations 也不支持，引用改从响应里尽力提取。
+OPENROUTER_TIMEOUT = 300        # 秒；联网检索 + 长文撰写，给足时间
+OPENROUTER_RETRIES = 2
+OPENROUTER_BACKOFF = 8          # 秒
+
+# 单条钉钉消息正文的 UTF-8 字节上限。
+# 官方对自定义机器人 markdown 正文长度没有任何明文规定（流传的 20000 字节查无出处），
+# 所以不留险，主动截断到 8KB。注意中文一字 3 字节，字符数 ≠ 字节数。
+MAX_MESSAGE_BYTES = 8000
+# 多条消息之间的间隔。官方限流是每机器人 20 条/分钟，超限直接封 10 分钟。
+MESSAGE_INTERVAL = 3            # 秒
+DINGTALK_RETRIES = 2
+DINGTALK_BACKOFF = 5            # 秒
+
+# ---------------------------------------------------------------------------
+# 促销稿过滤
+# ---------------------------------------------------------------------------
+# 为什么要在 Python 里硬拦：**提示词拦不住，实测过两轮**。
+# 2026-09-24 那次板块一 7 条里有 3 条是 Electrek 的折扣稿：
+#   · Jackery HomePower 3600 Pro Max —— .../jackery-early-access-prime-day-sale-...
+#   · Anker SOLIX E10             —— .../anker-solix-e10-system-exclusive-...
+#   · EcoFlow DELTA 3 Ultra Plus  —— .../ecoflow-early-prime-day-...
+# 模型自己在正文里都写了"该条信息属于销售活动"，却仍然把它们当作竞品动态列了出来 ——
+# 因为容量、价格这些数字是真实的，它不认为自己在编造。旧版（Tavily 方案）踩的是同一个坑，
+# 最后也是靠 Python 侧的 URL 过滤才解决（见 CLAUDE.md 的已知陷阱）。
+#
+# 匹配方式：**URL 路径先按 `/` 分段，段内再按 `-` `_` 切词，逐词比对**。
+# 刻意不做整串子串匹配 —— 旧版 JUNK_URL_SEGMENTS 曾用子串匹配误伤过大疆唯一的新品。
+# 只匹配路径，**不匹配域名**：9to5Toys 这类站本身偏导购，但它的新品报道是有效情报。
+PROMO_URL_TOKENS = frozenset({
+    "sale", "sales", "deal", "deals", "discount", "coupon", "promo",
+    "clearance", "exclusive", "savings", "bogo", "giveaway",
+})
+# 多词短语：在「按 - 切出的词序列」里**连续**出现才算命中，避免 `prime` 和 `day` 各在一处也中招。
+PROMO_URL_PHRASES = (
+    ("prime", "day"),
+    ("black", "friday"),
+    ("cyber", "monday"),
+    ("early", "access"),
+)
+# `30-off` / `30-percent-off` 形态。
+# ⚠️ **不要把 `off` 单独放进 PROMO_URL_TOKENS** —— `off-grid`（离网）是本领域核心词，
+# 单独列 off 会把它连同大量正常的离网产品页一起误伤。这个正则要求 off 前面紧跟数字。
+# 末尾的 `(?!-?[a-z])` 是第二道：**要求 off 不再接一个连字符复合词**。
+# 实测踩到过：`bluetti-balco-500-off-grid`、`dji-power-2000-off-grid-power-station`
+# 里的 `500-off` / `2000-off` 会被前半段匹配上 —— 那就是"500 型，离网"，
+# 跟"打五折"毫无关系。代价是漏掉 `30-off-anker-solix` 这种把商品名接在后面的写法，
+# 但这类 slug 通常改用 `-deal` / `-sale`，会被词表兜住，所以漏得起。
+PROMO_OFF_RE = re.compile(r"(?<![a-z0-9])\d+-(?:percent-)?off(?!-?[a-z])")
+
+# ---------------------------------------------------------------------------
+# 第二道，也是更可靠的一道：模型自己的"否定式自述"
+# ---------------------------------------------------------------------------
+# 实测原话（r7.md 里 Jackery 那一条，逐字抄自输出）：
+#   「该条信息属于销售活动，原文没有披露本周期新的结构形态、模块尺寸、重量变化、
+#     IP 等级或连接架构变化，因此不将其作为新品或结构改款处理。」
+# 模型**已经判断出这条没有结构情报价值，却仍然把它写进了板块一** ——
+# 因为容量和价格是真数字，它不觉得自己在编造，于是先写再补一句免责。
+#
+# 这条信号比 URL 特征可靠得多：换个不带 sale / deal 字样的域名，URL 那道就认不出来，
+# 但"我判断这条不是新品"这句话是模型自己下的结论，与域名无关。
+# 命中即整条删除 —— 既然它自己都说不是新品，这条就不该占一个条目。
+SELF_DISQUALIFY_RE = re.compile(
+    "|".join((
+        # 否定式结论：「不将其作为新品或结构改款处理」
+        r"不(?:将其|把它|该条|这条|该信息)?(?:作为|列为|计入|纳入|视作|视为)"
+        r"(?:本周|近期|本次)?(?:新品|竞品动态|结构改款|结构变化|结构升级|新品发布)",
+        r"(?:并非|不是|算不上|不属于)(?:本周|近期)?新品",
+        r"不(?:构成|属于)(?:本周|近期)?(?:新品|结构改款|结构变化|结构升级|产品迭代)",
+        # 把事件定性成销售活动：「该条信息属于销售活动」
+        r"(?:该条|这条|该信息|本条|上述)(?:信息|消息|内容)?(?:分别)?属于"
+        r"(?:销售|促销|营销|优惠|折扣|降价)活动",
+        r"属于(?:销售|促销|营销|优惠|折扣|降价)活动",
+    ))
+)
+
+
+
+# 华宝新能 / Jackery 现有产品线。第五板块的启发建议只能引用这里列出的产品线，
+# 避免模型编造型号。**产品线变动时必须同步这里。**
 JACKERY_PRODUCTS = """\
 - Explorer 系列：便携式户外电源主机（主力产品线）
-- SolarSaga 系列：折叠太阳能板（检索命中 SolarSaga 200 / 100 Light，IP68、IEC63163）
-- HomePower 系列：家庭备电 / 全屋储能系统（检索命中 HomePower 3600 Pro Max）
-- SolarVault 系列：阳台储能系统（检索命中 SolarVault 3，可扩展至全屋）
-- FridgeGuard：冰箱等单设备备电。卧式 CTB 结构，约 67mm 超薄，可立放/平放/壁挂，
-  单口 800W（峰值 1600W），可扩容至 2kWh，UPS 级无缝切换（平时当智能插座用）"""
-
-# 每周跑完后，模型会把"本期资讯里出现的、但不在 JACKERY_PRODUCTS 里的华宝产品线"报回来，
-# 提醒维护者更新上面那份清单。见 report_product_line_updates()。
-
-# URL 路径里出现这些片段就判为无信息价值的页面，在进模型之前就丢掉。
-#
-# 为什么要在 Python 里硬拦，而不是只靠提示词：实测提示词拦不住。
-# 明确写了"纯折扣稿一律丢弃"，模型仍然放进来一条 CNET 的
-# /deals/runhood-rallye-600-mini-power-station-deal-... —— 因为它把折扣页
-# 包装成了一条像模像样的"可插拔电池模组"解读。路径特征比语义判断可靠得多。
-#
-# ⚠️ 这份清单**只收促销页和聚合页**，不要往里加厂商的产品页 / 下载页
-#    （/product/、/downloads/ 之类）。曾经加过，结果把
-#    dji.com/cn/downloads/products/power-auro-2000-elite 一起拦掉了 ——
-#    而那是那一周唯一一条大疆新品的信息，得不偿失。
-#    厂商自营页交给提示词判断（它确实会丢掉一部分厂商产品页），
-#    判断失误的代价远小于硬拦误伤。
-JUNK_URL_SEGMENTS = [
-    "/deals/", "/deal/", "/coupon", "/promo", "/discount", "/voucher",
-    "/shop/", "/store/", "/cart/",
-    "/tag/", "/category/",         # 聚合页
-]
-
-# 全局屏蔽域名：社交平台与聚合站。它们经常挤掉正经行业媒体的位置，
-# 且对结构工程师没有信息价值。
-EXCLUDE_DOMAINS = [
-    "facebook.com", "instagram.com", "linkedin.com", "twitter.com", "x.com",
-    "pinterest.com", "tiktok.com", "threads.net", "quora.com", "medium.com",
-]
-
-# 中文技术类查询定向到的行业媒体。
-# 非定向的中文技术查询实测会跑偏到汽车、消费电子等无关领域，定向后稳定命中储能结构内容。
-CN_INDUSTRY_DOMAINS = [
-    "bjx.com.cn",        # 北极星储能网 / 电力新闻网
-    "escn.com.cn",       # 中国储能网
-    "elecfans.com",      # 电子发烧友
-    "gg-lb.com",         # 高工锂电
-    "d1ev.com",          # 第一电动
-    "36kr.com",          # 36氪
-]
-
-# 双语检索查询。category_hint 只是给模型的归类倾向提示，不强制。
-#
-# 查询词是实测调过的，不是拍脑袋写的：
-#   - 中文关键词堆砌（如"便携储能 户外电源 阳台储能 竞品 新品 结构 2026"）在 news 主题下
-#     会返回驱动之家日榜、淘宝规则页甚至赌博站，基本不可用；
-#   - 改成自然语言的短查询 + general 主题后，能稳定抓到厂商新品、专利、年报等有效信息。
-# 改动查询词后建议先跑 `python main.py --dry-run` 看实际召回质量。
-QUERIES: list[dict[str, Any]] = [
-    {
-        "query": "便携式储能电源 新品发布 行业动态",
-        "lang": "zh",
-        "topic": "general",
-        "category_hint": CATEGORY_COMPETITOR,
-    },
-    {
-        "query": "储能 电池包 结构 散热 IP防护 跌落",
-        "lang": "zh",
-        "topic": "general",
-        "include_domains": CN_INDUSTRY_DOMAINS,
-        "category_hint": f"{CATEGORY_STRUCTURE} / {CATEGORY_REGULATION}",
-    },
-    {
-        "query": "portable power station solar generator new release 2026",
-        "lang": "en",
-        "topic": "news",
-        "category_hint": CATEGORY_COMPETITOR,
-    },
-    {
-        "query": "balcony energy storage structural design",
-        "lang": "en",
-        "topic": "general",
-        "category_hint": f"{CATEGORY_STRUCTURE} / {CATEGORY_REGULATION}",
-    },
-]
-
-# Tavily 调用参数。
-# 注意：不要使用 days 参数 —— 它已从 Tavily 全部现行文档中移除，传了可能被静默忽略，
-# 导致"以为只取近 7 天，实际混进旧闻"。用 time_range 代替。
-SEARCH_DEPTH = "basic"          # 1 credit/次（advanced 是 2 credits）
-SEARCH_TIME_RANGE = "week"
-SEARCH_MAX_RESULTS = 10         # 服务端上限 20，默认 10
-SEARCH_RETRIES = 2
-SEARCH_RETRY_BACKOFF = 5        # 秒
-
-# 送入大模型的候选条数上限，控制 token 消耗。
-MAX_INPUT_ITEMS = 40
-# 每个分类最多收录几条。
-MAX_ITEMS_PER_CATEGORY = 6
-# 法规类不逐条展开，底部最多挂几条溯源链接。
-MAX_REGULATION_SOURCES = 3
-# 每期最多回报几条"清单外的华宝产品线"提醒。
-MAX_PRODUCT_UPDATES = 8
-# 提示词约定的"本节没有内容"占位说法。这些不算实质内容。
-_PLACEHOLDER_TEXT = {
-    "", "无", "本期无", "本期无。", "本期无相关资讯", "本周期暂无相关资讯", "暂无",
-}
-# 分类标题用的中文序号，与 CATEGORIES 顺序对应。
-CN_NUMERALS = ["一", "二", "三", "四", "五"]
-# 单条钉钉消息正文的 UTF-8 字节上限。
-# 官方文档对自定义机器人 markdown 正文长度没有任何明文规定（流传的 20000 字节查无出处），
-# 所以不留险，主动截断到 8KB。
-MAX_MESSAGE_BYTES = 8000
-# history_urls.json 保留的最大条目数，超出按日期淘汰最旧。
-MAX_HISTORY = 2000
+- SolarSaga 系列：折叠太阳能板（IP68、IEC 63163、IEC 61701 盐雾认证）
+- HomePower 系列：家庭备电 / 全屋储能系统
+- SolarVault 系列：阳台储能系统（可扩展至全屋）
+- FridgeGuard：冰箱等单设备备电，卧式 CTB 结构，约 67mm 超薄，可立放/平放/壁挂，
+  单口 800W（峰值 1600W），可扩容至 2kWh，UPS 级无缝切换"""
 
 LOG = logging.getLogger("newsbot")
+
+
+# ---------------------------------------------------------------------------
+# 跨周台账（读取、写入、渲染、抽取）
+# ---------------------------------------------------------------------------
+
+def normalize_url(url: str) -> str:
+    """把 URL 归一成去重用的键。
+
+    统一 http/https、去掉 `www.`、**只剥跟踪参数**、去掉末尾斜杠、主机小写。
+    query 里的非跟踪参数保留 —— 见 TRACKING_QUERY_KEYS 上的说明。
+    """
+    parts = urlsplit(url.strip())
+    host = parts.netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    path = parts.path.rstrip("/") or "/"
+    kept = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key.lower() not in TRACKING_QUERY_KEYS
+    ]
+    key = f"{host}{path}"
+    query = urlencode(kept)
+    return f"{key}?{query}" if query else key
+
+
+def is_index_page_url(url: str) -> bool:
+    """是不是栏目页/分类页/标签页这类聚合页。
+
+    这类页面**绝不进台账**：它们每周都被引用、内容每周都变，当作"已推送"记下来
+    会误杀未来所有引用它的条目。
+    """
+    parts = urlsplit(url)
+    segments = [seg for seg in parts.path.lower().split("/") if seg]
+    if any(seg in INDEX_PATH_SEGMENTS for seg in segments):
+        return True
+    return any(
+        key.lower() in INDEX_QUERY_KEYS for key, _ in parse_qsl(parts.query)
+    )
+
+
+def load_history(path: Path, today: date) -> list[dict]:
+    """读取台账，返回保留期内的条目（按 pushed 升序）。
+
+    任何读取或解析问题都**非 0 退出**（硬性约束 4）。这里刻意不用
+    `except Exception: entries = []` —— 那会把一个数据问题变成"跨周去重静默失效好几周"，
+    表现和根本没做这个功能一模一样，谁都不会发现。
+    """
+    if not path.exists():
+        LOG.info("台账 %s 不存在，按首次运行处理（本次不做跨周去重）", path.name)
+        return []
+
+    try:
+        # utf-8-sig：本地是 Windows，编辑器另存为 "UTF-8 with BOM" 时
+        # 普通 utf-8 解码会在首个 token 上抛 JSONDecodeError。
+        raw = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        sys.exit(
+            f"❌ 台账 {path.name} 无法解析：{type(exc).__name__}: {exc}\n"
+            f"   这个文件由 workflow 自动回写。请检查是否被手工改坏，"
+            f"或从 git 历史取回上一版。"
+        )
+
+    if not isinstance(raw, dict) or raw.get("version") != HISTORY_VERSION:
+        got = raw.get("version") if isinstance(raw, dict) else type(raw).__name__
+        sys.exit(
+            f"❌ 台账 {path.name} 的 version 不是 {HISTORY_VERSION}（读到 {got}）。\n"
+            f"   schema 变更要写迁移，不要直接忽略 —— 忽略会让去重静默失效。"
+        )
+
+    cutoff = today - timedelta(days=HISTORY_KEEP_DAYS)
+    entries: list[dict] = []
+    stale = malformed = 0
+    for item in raw.get("entries") or []:
+        try:
+            # ⚠️ today 在调用侧可能是**带时区**的 datetime，而台账里是 naive 的
+            # YYYY-MM-DD。两边不统一会抛 TypeError（不是 ValueError，不会被下面捕获），
+            # 所以这里统一降到 date 再比。
+            pushed = date.fromisoformat(str(item["pushed"]))
+        except (KeyError, TypeError, ValueError):
+            malformed += 1
+            continue
+        if pushed >= cutoff:
+            entries.append(item)
+        else:
+            stale += 1
+
+    if malformed:
+        LOG.warning("台账里有 %d 条格式不对的条目已跳过（pushed 字段缺失或不是 "
+                    "YYYY-MM-DD），请检查 —— 这些条目的去重保护已失效", malformed)
+    entries.sort(key=lambda e: str(e.get("pushed", "")))
+    if len(entries) > HISTORY_MAX_ENTRIES:
+        LOG.info("台账条目超过上限 %d，只保留最近 %d 条",
+                 HISTORY_MAX_ENTRIES, HISTORY_MAX_ENTRIES)
+        entries = entries[-HISTORY_MAX_ENTRIES:]
+    LOG.info("台账载入：%d 条在 %d 天保留期内（剔除 %d 条过期）",
+             len(entries), HISTORY_KEEP_DAYS, stale)
+    return entries
+
+
+def save_history(path: Path, entries: list[dict]) -> None:
+    """原子写入台账。
+
+    tmp + os.replace：Actions 的 timeout-minutes 到点被杀时留不下半截 JSON
+    （半截 JSON 下次会走 load_history 的失败分支，整个任务起不来）。
+    newline="\\n" + ensure_ascii=False：`.gitattributes` 把行尾统一成 LF，
+    主动写 LF 才不会在 Windows 本地产生整文件级的假 diff —— 那份文件的注释
+    就是为这件事写的。
+    """
+    payload = {
+        "version": HISTORY_VERSION,
+        "entries": sorted(entries, key=lambda e: str(e.get("pushed", ""))),
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(payload, fh, ensure_ascii=False, indent=2)
+        fh.write("\n")
+    os.replace(tmp, path)
+
+
+def seen_url_map(entries: list[dict]) -> dict[str, str]:
+    """返回 {归一化 URL: 推送日期}，供代码兜底判定用。
+
+    聚合页/栏目页直接跳过 —— 见 is_index_page_url。
+    """
+    seen: dict[str, str] = {}
+    for entry in entries:
+        pushed = str(entry.get("pushed", ""))
+        for url in entry.get("urls") or []:
+            if is_index_page_url(url):
+                continue
+            seen.setdefault(normalize_url(url), pushed)
+    return seen
+
+
+def history_note(entries: list[dict]) -> str:
+    """渲染"已推送过、不要重复"清单，拼进 user 提示词。
+
+    台账为空时返回空串，调用侧据此**整块省略** —— 不要渲染成 `（无）`，
+    那会给模型一个内容只有"无"的区块，它可能当成一条指令来执行。
+    """
+    if not entries:
+        return ""
+    rows = "\n".join(
+        f"  · {entry.get('pushed', '')} ｜ {entry.get('title') or '（无标题）'}"
+        for entry in entries
+    )
+    return (
+        "【已推送过的条目 —— 不要重复】\n"
+        "下列内容**上一期已经推送给读者了**，本期不要再写：\n"
+        f"{rows}\n"
+        "⚠️ **换一个来源、换一个链接也算重复**，同样不要写。\n"
+        "⚠️ 只有出现**新的进展**才值得再写一次 —— 例如新增披露了尺寸/重量/IP 等级、\n"
+        "   或有了新的结构改型。那种情况必须引用**新的**文章链接，并在正文里说明\n"
+        "   这是对已有报道的更新，不要当成一条全新动态。\n"
+        "（本来就不该重复的条目只是被这里挡了一次，不是让你少写 —— 报告短是可接受的。）"
+    )
+
+
+def extract_entries(report: str) -> list[dict]:
+    """从**最终推送出去的正文**里抽条目，供台账记录。
+
+    ⚠️ 必须是最终正文（plan_messages 的输入），**不是模型的原始输出** ——
+    从原始输出抽会把已经被促销过滤器删掉的条目标成"已推送"，那些内容就永远回不来了。
+
+    按 `### ` 分块；每块记标题（去掉 `###` 与粗体标记）与其中的文章页链接。
+    **没有链接的块也照样记录标题** —— 否则下周它还会以同样的话术再来一遍。
+    `## 参考来源` 兜底用的是 `<url>` 尖括号写法，MARKDOWN_LINK_RE 匹配不到，
+    正好不会被误记。
+    """
+    entries: list[dict] = []
+    for block in group_blocks(report):
+        chunk = "\n".join(block)
+        if not chunk.lstrip().startswith("### "):
+            continue
+        # 厂商名在 `### ` 行里通常是加粗的（`### **BLUETTI** —— ...`），
+        # `strip("*")` 只去首尾，中间的 `**` 会留下来污染标题，所以整体删掉星号。
+        title = re.sub(r"\*+", "", block[0].lstrip("# ")).strip()
+        if not title:
+            continue
+        urls = sorted({
+            url for url in MARKDOWN_LINK_RE.findall(chunk)
+            if not is_index_page_url(url)
+        })
+        entries.append({"title": title, "urls": urls})
+    return entries
+
+
+# ---------------------------------------------------------------------------
+# 提示词
+# ---------------------------------------------------------------------------
+
+# 三个提示词共用的角色设定与写作要求。抽成常量 —— 改规则只改这一处。
+# 板块一现在独立跑两轮，共用一份规则是必需的，否则三份会各自漂移。
+ROLE_AND_RULES = f"""你是储能行业的资深硬件分析师，长期服务于华宝新能（Jackery）的储能结构工程师团队。
+你的读者是**做结构设计的工程师**，不是投资人也不是采购。
+
+写作要求：
+- 结论先行、信息密度高、不写套话，不要"综上所述""值得关注"这类空转。
+- 只写**近 {WINDOW_DAYS} 天**的真实动态。检索不到就诚实说没有，
+  **绝对不要编造产品、日期、数字或链接**。
+- 关键数据必须精准：重量、尺寸、体积/重量变化百分比、容量、功率、IP 防护等级、
+  能量密度、压实密度、循环寿命、价格。拿不准的数字宁可不写，也不要写个大概。
+- ⚠️ **中英双语并行检索 —— 这一条最关键，直接决定板块一有没有内容。**
+  便携储能与阳台储能的新品首发**绝大多数只出现在英文行业媒体**，中文媒体通常不转载。
+  只搜中文会系统性漏掉整个板块一。必须同时用英文关键词检索，英文源清单与关键词
+  见 user 提示。
+- 每条资讯都要带**原始网页链接**，写成 `[来源简称](完整URL)` 的形式，紧跟在句末。
+  ⚠️ 链接**必须是文章详情页**。栏目页、分类页、标签页、聚合页一律不要 ——
+  路径形如 `/category/...`、`/tag/...`、`/subjects/...`、`/industry-updates/`、
+  `?column_id=...`、以栏目名结尾的 `.html`，点进去都是文章列表，读者找不到对应那条。
+  **拿不到文章页链接就宁可不要这条。**
+  同一个来源链接允许在文中重复出现（同一事件分段分析时会再引一次），不必刻意去重。
+- **禁止"占位条"，但允许"薄条目"** —— 这两者要分清楚：
+  - ❌ 占位条：`EcoFlow —— 本周期未检索到可核实的新品/结构变化`。
+    通篇"未检索到"厂商名单是在凑数，**直接删掉，不要写**。
+  - ✅ 薄条目：真发生了事件、只是细节没公开，**这条要留**。
+    例：`BLUETTI 在 IFA 2026 展示 Balco 500 阳台储能一体机（5,024Wh、4,600W 光伏输入），
+    未披露尺寸与重量`。
+- ⚠️ **促销、折扣、优惠信息不是动态，任何板块都不要写。** 讲「降价」「到手价」
+  「限时优惠」「Prime Day / 黑五促销」「专属折扣」的文章，**哪怕里面的容量、价格数字
+  完全真实**，也一律不作为条目 —— 读者的工作是设计结构，不是盯价格。判别标准：
+  这条讲的是**产品与结构本身**，还是**卖多少钱**？只讲后者就删掉。
+  真实新品发布时厂商顺带公布的价格可以写，但主体必须是产品与结构。
+  某个厂商本周期只有促销稿时，**该厂商直接不写**，不要为了凑厂商数把它塞进来。
+  ⚠️ **自我检查**：如果你写着写着需要补一句「该条信息属于销售活动……因此不将其作为
+  新品或结构改款处理」之类的话，那就是你在告诉自己**这条根本不该写** ——
+  **直接删掉整条，不要先写出来再补一句否定。** 本地脚本会把这类条目连同它的
+  「……不将其作为新品处理」一并删除，写出来只会浪费篇幅。
+- 某个板块本周确实没有实质动态时，**一句话说明即可**，不要用占位条撑篇幅。
+- 厂商名与产品型号用**粗体**。
+- 中文撰写。英文来源的厂商名与产品型号保留原文（如 EcoFlow、Anker SOLIX S2000、
+  BLUETTI Balco 500），**不要音译或意译成中文**。
+- 篇幅要够：读者宁可长一点，也不要一份只有标题的空壳。但要**靠真事件堆篇幅，
+  不靠占位条堆篇幅**。
+- ⚠️ **优先写最近的。** 检索窗口有两周，但读者的关注点是**刚刚发生的**。
+  同一个板块里，先把最近几天的事件写完；窗口前半段（第 8~14 天）的内容只在
+  近几天确实没有该板块的动态时才拿来补位。**不要拿两周前的旧事充当本周动态。**
+- ⚠️ **本期动态少时，报告短是正常的、可以接受的。** 这跟上面"篇幅要够"不冲突：
+  宁可用三条真事件撑起一个板块，也不要为了凑篇幅去写占位条、写促销稿，或者
+  把上期已经报过的事情换个说法再讲一遍 —— 那三种都是明确禁止的。
+- 只写要求你写的板块，多一个少一个都不行。"""
+
+# 板块一的标题固定。两轮调用都要原样输出它，本地靠它定位这一块。
+SECTION1_HEADING = "## 一、便携&阳台储能竞品动态"
+
+# 五个板块的标题，顺序即报告顺序。**这是本地唯一的板块清单** ——
+# build_report 用它校验"五个板块都在且非空"（见该函数），
+# drop_repeat_blocks 用 SECTION_FIVE_HEADING 判断哪些内容必须排除在删除之外。
+# 改动板块标题时这里和三个提示词要一起改（硬性约束 2）。
+SECTION_HEADINGS = (
+    SECTION1_HEADING,
+    "## 二、户用&工商业储能与大机动态",
+    "## 三、电池与材料技术突破",
+    "## 四、安规与政策大事件",
+    "## 五、对华宝新能（Jackery）结构与产品定义的启发",
+)
+
+# 板块五由板块一的结论推导而来，**它的链接天然是板块一的子集**。
+# 所以任何"看到链接已推送过就删"的逻辑都必须永久跳过它，否则整块会被删光。
+SECTION_FIVE_HEADING = SECTION_HEADINGS[-1]
+
+# 板块一的厂商范围与写作重点。第一轮与第二轮两个提示词共用。
+SECTION1_VENDORS = """\
+   EcoFlow（正浩）、Anker SOLIX、BLUETTI（德兰明海）、DJI Power（大疆）、
+   Jackery（华宝新能）、Goal Zero、Segway、Oupes、Vtoman、Eco-Worthy 等的新品与形态变化。
+   **检索时用英文名**：EcoFlow / Anker SOLIX / BLUETTI / DJI Power / Jackery /
+   Goal Zero / Segway / Oupes / Vtoman；阳台储能另有 Hoymiles、Zendure、
+   Anker SOLIX Solarbank、PowerOak。
+   每条重点写：新品形态、体积/重量相对前代的变化%、防护等级、盲插/堆叠/无线连接架构、价格。
+   用 `### 厂商 —— 一句话标题` 作为厂商小标题，**厂商名保留英文原文**。"""
+
+# 主调用：板块二~五。板块一已拆出去单独跑两轮（见 fetch_section1），
+# 所以这里必须明确不要它 —— 否则会拿到两份板块一。
+MAIN_SYSTEM_PROMPT = f"""{ROLE_AND_RULES}
+
+输出格式（标题必须原样保留 `{DINGTALK_KEYWORD}` 这几个字，钉钉靠它做安全校验）：
+第一行是一级标题：`# {DINGTALK_KEYWORD} 储能结构周报（YYYY-MM-DD）`
+紧接着一行引用块写覆盖周期。然后**严格按下面四个二级标题**组织（标题文字不要改动）：
+
+
+## 二、户用&工商业储能与大机动态
+   华为数字能源（Huawei）、比亚迪储能（BYD）、阳光电源（Sungrow）、德业（Deye）、
+   派能（Pylontech）、海辰储能（Hithium）、欣旺达（Sunwoda）、宁德时代（CATL）、
+   亿纬锂能（EVE）、特斯拉 Powerwall（Tesla）等。
+   每条重点写：高压架构（如 800V 直流、1000VAC）、构网型技术、液冷/风冷热管理如何集成进结构、
+   机柜与堆叠方式、容量与功率等级。
+   同样用 `### 厂商 —— 一句话标题` 作为小标题。
+
+## 三、电池与材料技术突破
+   新电芯化学（高压实 LFP、钠离子、固态）、阻燃与隔热新材料（气凝胶、阻燃工程塑料）、
+   轻量化材料、以及**膨胀力对 Pack 结构的影响**这类与结构强相关的隐患。
+   每条重点写：材料/电芯体系的量化指标，以及它对 Pack 结构设计意味着什么。
+
+## 四、安规与政策大事件
+   UL 2743、欧洲阳台光伏与户储规范（如德国 DIN VDE V 0126-95、UL 3700）、
+   各国认证与关税、供应链与产能政策。这一节写成**若干条短段落**，
+   不需要厂商小标题，但同样要给链接。
+
+## 五、对华宝新能（Jackery）结构与产品定义的启发
+   从**硬件视角**总结 3 点建议，每点 2~3 句，落点在 Pack 集成度、散热风道设计、
+   新材料与新工艺的应用、可制造性、认证前置这些结构工程师能动手的地方。
+   可以引用产品线时**只能引用下面清单里列出的**，清单外的型号一律不要提：
+{JACKERY_PRODUCTS}
+
+最后一行单独写：`—— 本消息由自动化脚本生成，检索源：Perplexity sonar-pro-search`
+
+⚠️ **不要写板块一「便携&阳台储能竞品动态」。** 它由另一路检索专门负责，
+你写了就会和它重复。"""
+
+
+# 板块一第一轮：检索预算全部集中在这一个板块上。
+# 拆出来的理由与实测数据见 CLAUDE.md —— 五个板块挤在一次调用里会把检索预算摊薄，
+# 板块一（最依赖英文检索）经常整块为空，同配置两次运行的方差也极大。
+SECTION1_SYSTEM_PROMPT = f"""{ROLE_AND_RULES}
+
+本次任务：**只做「便携&阳台储能竞品动态」这一个板块**，不要写任何其它板块。
+
+输出格式：
+第一行就是二级标题 `{SECTION1_HEADING}`（文字照抄，一个字都不要改），
+下面用 `### 厂商 —— 一句话标题` 逐条展开。
+**不要写一级标题，也不要写"覆盖周期"那一行** —— 它们由本地统一生成。
+
+板块范围与写作重点：
+{SECTION1_VENDORS}"""
+
+
+# 板块一第二轮：带上第一轮的原文，补漏 + 合并成最终的一份。
+# 两轮结果**不做本地拼接** —— 拼接会得到两份互相重复、口径不一的板块。
+SECTION1_MERGE_SYSTEM_PROMPT = f"""{ROLE_AND_RULES}
+
+本次任务的特殊之处：user 消息里会给你**第一轮检索**的原文。你要做三件事：
+1. **再检索一轮，专补第一轮漏掉的。** 第一轮一条都没提到的厂商，优先单独查一遍；
+   提到了但没给参数的，再试试能否找到参数。
+2. **合并去重。** 同一厂商的同一件事只保留一处，不要出现两条讲同一件事。
+   参数以更完整的那一轮为准；两轮说法冲突时，回到原文核实。
+3. **综合总结成最终的一个板块。** 不是把两轮首尾相接，而是重新组织成一份完整、
+   不重复、口径一致的板块。第一轮里表述含糊或没有链接的条目，可以直接丢掉。
+
+输出格式：
+第一行就是二级标题 `{SECTION1_HEADING}`（文字照抄，一个字都不要改），
+下面用 `### 厂商 —— 一句话标题` 逐条展开。
+**不要写一级标题，也不要写"覆盖周期"那一行。**
+不要输出"第一轮""第二轮""上一轮"这类过程说明，直接给最终结果。
+
+板块范围与写作重点：
+{SECTION1_VENDORS}"""
+
+
+def _window(today: datetime) -> tuple[str, str]:
+    """返回 (起始日, 结束日)，格式 YYYY-MM-DD。
+
+    这是全项目唯一的窗口定义。**不要再在别处写 `timedelta(days=...)`** ——
+    build_report 的 header 里曾经有过第二处，窗口一改就会和这里对不上，
+    报告会印着 7 天的覆盖周期、却检索了 14 天。
+    """
+    return (
+        (today - timedelta(days=WINDOW_DAYS)).strftime("%Y-%m-%d"),
+        today.strftime("%Y-%m-%d"),
+    )
+
+
+def _retrieval_hint() -> str:
+    """检索型调用的 user 提示里都要附的英文源清单与关键词。"""
+    return (
+        "【检索语言 —— 这一条决定板块一有没有内容】\n"
+        "便携储能与阳台储能的新品首发，绝大多数**只出现在英文行业媒体**，"
+        "中文媒体通常不转载。**只搜中文会系统性漏掉整个板块。**\n"
+        "请中英双语并行检索，并覆盖下列英文源：\n"
+        "  · 厂商官方新闻稿：PR Newswire、Business Wire、EQS News、GlobeNewswire\n"
+        "  · 行业媒体：pv magazine、ESS News、Energy-Storage.News、Electrek、\n"
+        "    CleanTechnica、Solar Power World\n"
+        "  · 消费电子与评测：Gizmodo、The Verge、Notebookcheck、9to5Toys、\n"
+        "    DroneDJ / DroneXL、Impress Watch、PC Watch\n"
+        "  · 展会官方发布：Solar & Storage Live、IFA、Intersolar、RE+、SNEC\n"
+        "英文关键词示例：portable power station launch、home battery module、\n"
+        "balcony solar storage、all-in-one ESS、sodium-ion BESS、new LFP cell、\n"
+        "drop test / IP rating / thermal runaway enclosure、swappable battery module。"
+    )
+
+
+def build_section1_user_prompt(
+    today: datetime, history: list[dict] | None = None
+) -> str:
+    """板块一第一轮的 user 提示。
+
+    history 是跨周台账。放在第一轮而不是只放第二轮，是因为第一轮的检索量最大，
+    上期标题清单在这里能提前把模型往新内容上引，省得它把预算花在已经报过的事上。
+    """
+    start, end = _window(today)
+    note = history_note(history or [])
+    return (
+        f"请检索并汇总 {start} 至 {end}（近 {WINDOW_DAYS} 天）"
+        f"**便携与阳台储能竞品**的新品与形态变化，"
+        f"面向储能结构工程师。\n\n"
+        f"今天日期：{end}。请以这个日期为准判断哪些是近 {WINDOW_DAYS} 天的新闻。\n"
+        f"请横向覆盖尽可能多的厂商，不要只写一两家就收尾。\n"
+        f"{note}\n"
+        f"{_retrieval_hint()}\n\n"
+        f"再次强调：只写真实发生的动态，每条都要带**文章详情页**的原始链接"
+        f"（不要栏目页、分类页、聚合页），数据要精准，不要编造。"
+    )
+
+
+def _seen_url_block(seen: dict[str, str]) -> str:
+    """第二轮用的「这些链接已推送过」区块。
+
+    刻意与促销黑名单分成两段、两套措辞：促销黑名单说的是"这些页面是折扣稿，别引用"，
+    这里说的是"这些页面是好内容，但上期已经推过了，本期的**新进展**才值得再写"。
+    ⚠️ 两者绝不能合并 —— 合并会让模型把上期的真新闻也当成折扣稿，连带躲开整个域名。
+    """
+    if not seen:
+        return ""
+    rows = "\n".join(f"- {url}" for url in sorted(seen)[:80])
+    return (
+        "\n【下列链接上一期已经推送过】\n"
+        f"{rows}\n"
+        "这些页面本身没问题，只是**读者已经看过了**。除非本周期出现了新的进展\n"
+        "（新增披露了尺寸/重量/IP 等级、有了新的结构改型），否则不要把它们再列为条目；\n"
+        "确实有新进展时必须引用**新的**文章链接，并说明这是对已有报道的更新。\n"
+    )
+
+
+def build_section1_merge_user_prompt(
+    today: datetime,
+    first_pass: str,
+    banned_urls: list[str],
+    history: list[dict] | None = None,
+    seen: dict[str, str] | None = None,
+) -> str:
+    """板块一第二轮的 user 提示：把第一轮原文交给它，要求补漏并合并。
+
+    first_pass 传进来前已经被 drop_promo_blocks 洗过一遍；banned_urls 是被洗掉的那些
+    链接，显式列出来是为了让第二轮**不要再去引用它们** —— 只删掉不告知的话，模型补漏时
+    很可能从同一批检索结果里再把同一篇折扣稿捞回来。
+
+    history / seen 是跨周台账，两者信息互补：history 给"上期标题"（软性拦截换来源的
+    重复），seen 给"上期链接"（拦住同一篇文章）。**它们是独立参数，不要并进 banned_urls。**
+    """
+    start, end = _window(today)
+    blacklist = ""
+    if banned_urls:
+        blacklist = (
+            "\n⚠️ 下列链接**已被判定为促销/折扣稿并剔除，禁止引用**：\n"
+            + "\n".join(f"- {u}" for u in banned_urls)
+            + "\n（这些页面讲的是降价、优惠、到手价，不是新品或结构变化。促销信息一律不作"
+              "为竞品动态条目；某个厂商本周期只有促销稿时，该厂商直接不写，不要为凑厂商数塞进来。）\n"
+        )
+    note = history_note(history or [])
+    return (
+        f"覆盖周期：{start} 至 {end}（近 {WINDOW_DAYS} 天）。今天日期：{end}。\n\n"
+        f"{_retrieval_hint()}\n"
+        f"{blacklist}\n"
+        f"{_seen_url_block(seen or {})}\n"
+        f"{note}\n"
+        f"===== 第一轮检索结果开始 =====\n{first_pass}\n===== 第一轮检索结果结束 =====\n\n"
+        f"请按系统提示的要求执行：先再检索一轮补漏，然后把两轮合并去重、"
+        f"综合总结成最终的一份「便携&阳台储能竞品动态」。"
+    )
+
+
+def build_user_prompt(
+    today: datetime, section1: str = "", history: list[dict] | None = None
+) -> str:
+    """主调用的 user 提示：板块二~五。
+
+    section1 是板块一两轮跑完后的最终正文。传进来只为一件事 —— 板块五的启发
+    需要知道便携竞品这周发生了什么。**明确告诉它不要抄进输出**，否则会重复一块。
+    """
+    start, end = _window(today)
+    context = ""
+    if section1.strip():
+        context = (
+            f"\n===== 板块一最终结果（**仅供你写板块五时参考**，"
+            f"不要抄进你的输出）=====\n{section1}\n===== 参考内容结束 =====\n"
+        )
+    note = history_note(history or [])
+    return (
+        f"请检索并汇总 {start} 至 {end}（近 {WINDOW_DAYS} 天）全球储能行业的硬件工程动态，"
+        f"面向储能结构工程师，按系统提示里的四个板块（二、三、四、五）输出。\n\n"
+        f"今天日期：{end}。请以这个日期为准判断哪些是近 {WINDOW_DAYS} 天的新闻。\n"
+        f"**不要写板块一。**\n"
+        f"{context}\n"
+        f"{note}\n"
+        f"{_retrieval_hint()}\n\n"
+        f"再次强调：只写真实发生的动态，每条都要带**文章详情页**的原始链接"
+        f"（不要栏目页、分类页、聚合页），数据要精准，不要编造。"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -187,737 +699,673 @@ LOG = logging.getLogger("newsbot")
 # ---------------------------------------------------------------------------
 
 def load_config(dry_run: bool) -> dict[str, str]:
-    """读取并校验环境变量。缺失或格式不对时立刻退出，不拖到运行中途才崩。"""
+    """读取并校验环境变量。缺什么、去哪配，一次性说清楚再退出。"""
     missing: list[str] = []
 
-    def get(name: str, required: bool = True, default: str = "") -> str:
-        value = (os.environ.get(name) or "").strip()
-        if not value:
-            if required:
-                missing.append(name)
-            return default
-        return value
-
-    cfg = {
-        "TAVILY_API_KEY": get("TAVILY_API_KEY"),
-        "OPENAI_API_KEY": get("OPENAI_API_KEY"),
-        "OPENAI_BASE_URL": get("OPENAI_BASE_URL", required=False, default="https://api.deepseek.com/v1"),
-        # ⚠️ 别写回 "deepseek-chat" —— 2026-09 实测该端点已不再提供这个 id
-        # （可用的是 deepseek-v4-pro / deepseek-flash），写错每次调用都会失败。
-        "OPENAI_MODEL": get("OPENAI_MODEL", required=False, default="deepseek-flash"),
-        # dry-run 不推送，所以不强制要求 webhook。
-        "DINGTALK_WEBHOOK": get("DINGTALK_WEBHOOK", required=not dry_run),
-    }
-
-    if missing:
-        lines = ["以下环境变量缺失，无法运行："]
-        for name in missing:
-            lines.append(f"  - {name}")
-        lines.append("")
-        lines.append("本地运行：把值写在项目根目录的 Key 文件里，或直接 export。")
-        lines.append("GitHub Actions：在仓库 Settings → Secrets and variables → Actions 里配置。")
-        sys.exit("\n".join(lines))
-
-    # DINGTALK_WEBHOOK 格式校验。
-    # 钉钉机器人 webhook 必须是 oapi.dingtalk.com/robot/send?access_token=...
-    # 这一条能把"误填了飞书文档链接"之类的错误在启动时就拦下，
-    # 而不是等推送时返回一个看不懂的 310000。
-    webhook = cfg["DINGTALK_WEBHOOK"]
-    if webhook and not webhook.startswith("https://oapi.dingtalk.com/robot/send"):
-        sys.exit(
-            "DINGTALK_WEBHOOK 格式不对。\n"
-            f"  当前值：{webhook[:60]}{'...' if len(webhook) > 60 else ''}\n"
-            "  期望值：https://oapi.dingtalk.com/robot/send?access_token=xxxxxxxx\n"
-            "  注意：飞书（feishu.cn）的链接不是钉钉 webhook，两者不通用。"
+    # 优先 OPENROUTER_API_KEY（名字准确），兼容旧名 PERPLEXITY_API_KEY ——
+    # 免得已经按旧名配好 Secret 的人遇到一个看不懂的"缺变量"。
+    api_key = (
+        os.environ.get("OPENROUTER_API_KEY")
+        or os.environ.get("PERPLEXITY_API_KEY")
+        or ""
+    ).strip()
+    if not api_key:
+        missing.append(
+            "OPENROUTER_API_KEY —— OpenRouter 控制台的 API Key（sk-or-v1- 开头）。\n"
+            "    本地：加进项目根目录的 Key 文件；线上：仓库 Settings → Secrets → Actions"
         )
 
-    return cfg
+    webhook = (os.environ.get("DINGTALK_WEBHOOK") or "").strip()
+    if not webhook and not dry_run:
+        missing.append(
+            "DINGTALK_WEBHOOK —— 必须是 https://oapi.dingtalk.com/robot/send?access_token=...\n"
+            "    注意别填成飞书（feishu.cn）的链接，两者不通用"
+        )
+    # 格式校验放在启动时，比发出消息后拿到 310000 再回头排查省事得多。
+    if webhook and not webhook.startswith("https://oapi.dingtalk.com/"):
+        sys.exit(
+            f"❌ DINGTALK_WEBHOOK 格式不对。\n"
+            f"   期望：https://oapi.dingtalk.com/robot/send?access_token=...\n"
+            f"   实际：{webhook[:40]}...\n"
+            f"   （如果是 feishu.cn 开头的链接，那是飞书的，钉钉用不了）"
+        )
+
+    if missing:
+        sys.exit("❌ 缺少必需的环境变量：\n\n" + "\n\n".join(f"  - {m}" for m in missing))
+
+    return {
+        "OPENROUTER_API_KEY": api_key,
+        "DINGTALK_WEBHOOK": webhook,
+        "OPENROUTER_MODEL": (os.environ.get("OPENROUTER_MODEL") or OPENROUTER_MODEL).strip(),
+    }
 
 
 # ---------------------------------------------------------------------------
-# URL 归一化与去重
+# OpenRouter 调用
 # ---------------------------------------------------------------------------
 
-# 常见追踪参数。带上这些参数的同一篇文章会被当成两条新闻，必须剥掉。
-_TRACKING_PARAMS = {
-    "fbclid", "gclid", "dclid", "msclkid", "yclid", "igshid", "mc_cid", "mc_eid",
-    "ref", "ref_src", "referrer", "spm", "share_token", "share_from", "from",
-    "source", "_hsenc", "_hsmi", "trk", "trkCampaign", "sc_cid",
-}
+def extract_citations(data: dict, message: dict) -> list[str]:
+    """尽力从响应里取回引用链接。
 
-
-def normalize_url(url: str) -> str:
-    """归一化 URL，用于去重比对。无法解析时返回空串（调用方应丢弃该条）。"""
-    if not url:
-        return ""
-    try:
-        parts = urlsplit(url.strip())
-    except ValueError:
-        return ""
-
-    if not parts.scheme or not parts.netloc:
-        return ""
-
-    netloc = parts.netloc.lower()
-    # www 前缀统一去掉：同一站点的 www 与非 www 版本应视为同一个链接。
-    if netloc.startswith("www."):
-        netloc = netloc[4:]
-
-    kept_query = [
-        (key, value)
-        for key, value in parse_qsl(parts.query, keep_blank_values=True)
-        if not key.lower().startswith("utm_") and key.lower() not in _TRACKING_PARAMS
-    ]
-
-    path = parts.path.rstrip("/") or "/"
-
-    return urlunsplit(("https", netloc, path, urlencode(kept_query), ""))
-
-
-def is_low_value_url(normalized_url: str) -> bool:
-    """判断归一化后的 URL 是否是促销页 / 店铺页 / 下载页 / 聚合页。
-
-    这类页面即使内容沾边，对结构工程师也没有情报价值，而且模型常常把
-    "某款产品打折" 包装成一条像模像样的产品解读放进来 —— 所以在送进模型前就拦掉。
-
-    只按**路径分段**匹配，不做子串匹配：`/sale` 这种片段会误伤正常文章路径
-    （比如 /wholesale-market-report），必须要求它自成一段。
+    OpenRouter 的返回形状随模型而异，实测至少三种可能，所以逐个探：
+      1. 顶层 citations（Perplexity 原生接口的字段，OpenRouter 有时透传）
+      2. message.annotations 里 type == "url_citation" 的 url（OpenRouter 的归一化格式）
+      3. message.citations
+    取不到就返回空列表 —— 调用方只在"正文一个链接都没有"时才用它兜底。
     """
-    try:
-        path = urlsplit(normalized_url).path.lower()
-    except ValueError:
-        return False
+    urls: list[str] = []
 
-    junk_words = [s.strip("/") for s in JUNK_URL_SEGMENTS]
+    for item in (data.get("citations") or []):
+        if isinstance(item, str) and item:
+            urls.append(item)
+
+    for item in (message.get("citations") or []):
+        if isinstance(item, str) and item:
+            urls.append(item)
+
+    for ann in (message.get("annotations") or []):
+        if not isinstance(ann, dict):
+            continue
+        # 有的实现把 url 放在 url_citation 子对象里，有的平铺在顶层。
+        payload = ann.get("url_citation") if isinstance(ann.get("url_citation"), dict) else ann
+        url = payload.get("url") if isinstance(payload, dict) else None
+        if isinstance(url, str) and url:
+            urls.append(url)
+
+    # 去重但保序
+    seen: set[str] = set()
+    unique: list[str] = []
+    for url in urls:
+        if url not in seen:
+            seen.add(url)
+            unique.append(url)
+    return unique
+
+
+def call_openrouter(
+    cfg: dict[str, str], messages: list[dict[str, str]], label: str = ""
+) -> tuple[str, list[str]]:
+    """调用 OpenRouter 上的 sonar-pro-search，返回 (Markdown 正文, 引用链接)。
+
+    messages 由调用方组装 —— 现在有三次调用（板块一两轮 + 其余板块一轮），
+    各自的 system/user 提示不同，所以不在这里拼。label 只用于日志区分是哪一路，
+    失败时能一眼看出是哪个板块挂了。
+    """
+    tag = f"[{label}] " if label else ""
+    payload = {
+        "model": cfg["OPENROUTER_MODEL"],
+        "messages": messages,
+        "temperature": OPENROUTER_TEMPERATURE,
+        "max_tokens": OPENROUTER_MAX_TOKENS,
+        # web_search_options 是该模型在 supported_parameters 里明确支持的联网开关
+        # （search_recency_filter / return_citations 都不支持，见文件顶部说明）。
+        # search_context_size 取 high，让它在检索上多花点力气。
+        "web_search_options": {"search_context_size": "high"},
+    }
+    headers = {
+        "Authorization": f"Bearer {cfg['OPENROUTER_API_KEY']}",
+        "Content-Type": "application/json",
+        # OpenRouter 要求的调用方标识，非必填但建议带。
+        "HTTP-Referer": OPENROUTER_REFERER,
+        "X-Title": OPENROUTER_TITLE,
+    }
+
+    last_exc: Exception | None = None
+    for attempt in range(1, OPENROUTER_RETRIES + 2):
+        try:
+            response = requests.post(
+                OPENROUTER_URL, json=payload, headers=headers, timeout=OPENROUTER_TIMEOUT,
+            )
+            # 限流与 5xx 值得重试，4xx 其余情况重试也没用。
+            if response.status_code == 429 or response.status_code >= 500:
+                raise RuntimeError(f"HTTP {response.status_code}: {response.text[:300]}")
+            if response.status_code != 200:
+                # 400/401/403 基本是 key 或模型名的问题，直接把响应体带出来便于定位。
+                sys.exit(
+                    f"❌ OpenRouter 返回 HTTP {response.status_code}，重试无意义。\n"
+                    f"   {response.text[:500]}\n"
+                    f"   （401/403 多为 API Key 无效；402 是余额不足；"
+                    f"400 多为模型名不存在或参数不合法）"
+                )
+
+            data = response.json()
+            choices = data.get("choices") or []
+            if not choices:
+                # OpenRouter 会把上游错误放在 error 字段里，一并带出来便于定位。
+                if data.get("error"):
+                    raise RuntimeError(f"OpenRouter 返回错误：{str(data['error'])[:300]}")
+                raise RuntimeError(f"响应里没有 choices：{str(data)[:300]}")
+            message = choices[0].get("message") or {}
+            content = message.get("content") or ""
+            # 被 max_tokens 截断是**静默**的：_assert_all_sections 能拦住"末端板块
+            # 整个没了"，但拦不住"板块四被砍掉最后两句"。这里补一条告警，让日志能直接
+            # 定位到"报告变薄"是截断造成的，而不是检索没找到东西。
+            if choices[0].get("finish_reason") == "length":
+                LOG.warning(
+                    "%s输出被 max_tokens 截断（finish_reason=length）—— "
+                    "末尾内容已丢失，考虑继续调高 OPENROUTER_MAX_TOKENS（模型上限 8000）",
+                    tag,
+                )
+            return content.strip(), extract_citations(data, message)
+
+        except SystemExit:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            LOG.warning("%sOpenRouter 调用失败（第 %d/%d 次）：%s",
+                        tag, attempt, OPENROUTER_RETRIES + 1, exc)
+            if attempt <= OPENROUTER_RETRIES:
+                time.sleep(OPENROUTER_BACKOFF * attempt)
+
+    raise RuntimeError(
+        f"{tag}OpenRouter 调用持续失败：{type(last_exc).__name__}: {last_exc}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 正文校验与组装
+# ---------------------------------------------------------------------------
+
+def strip_model_heading(text: str) -> str:
+    """去掉模型自己写的一级标题与开头的引用块。
+
+    标题和"覆盖周期"那行都由本地统一生成 —— 钉钉关键词必须稳定出现在正文里，
+    不能指望模型每次都听话；而且模型自己写的元信息行会和本地生成的重复一行。
+    """
+    lines = text.split("\n")
+    while lines:
+        stripped = lines[0].lstrip()
+        # 空行、一级标题、以及开头的引用块（模型的"覆盖周期"行）都丢掉。
+        if not stripped or stripped.startswith("# ") or stripped.startswith(">"):
+            lines.pop(0)
+        else:
+            break
+    return "\n".join(lines).strip()
+
+
+def has_markdown_link(text: str) -> bool:
+    return bool(re.search(r"\]\(https?://", text))
+
+
+MARKDOWN_LINK_RE = re.compile(r"\]\((https?://[^)\s]+)\)")
+
+
+def url_promo_reason(url: str) -> str | None:
+    """URL 路径命中促销特征时返回命中的那个词，否则 None。
+
+    只看路径，不看域名与查询串（`?utm_source=` 之类是跟踪参数，不携带语义）。
+    路径按 `/` 分段，段内再按 `-` `_` 切词逐词比对 —— 见常量区的说明。
+    """
+    path = urlsplit(url).path
     for segment in path.split("/"):
         if not segment:
             continue
-        for junk in junk_words:
-            # 精确段匹配，或作为某段的前缀（覆盖 /deals-2026 这类写法）。
-            if segment == junk or segment.startswith(junk + "-"):
-                return True
-    return False
+        segment = segment.lower()
+        hit = PROMO_OFF_RE.search(segment)
+        if hit:
+            return hit.group(0)
+        tokens = [t for t in re.split(r"[-_]", segment) if t]
+        for token in tokens:
+            if token in PROMO_URL_TOKENS:
+                return token
+        for phrase in PROMO_URL_PHRASES:
+            n = len(phrase)
+            for i in range(len(tokens) - n + 1):
+                if tuple(tokens[i:i + n]) == phrase:
+                    return "-".join(phrase)
+    return None
 
 
-# ---------------------------------------------------------------------------
-# history_urls.json
-# ---------------------------------------------------------------------------
+def block_drop_reason(chunk: str) -> str | None:
+    """一个 `### ` 条目块该不该删？返回删除理由，该留则返回 None。
 
-def load_history() -> dict[str, str]:
-    """读取已推送 URL 台账。文件不存在或损坏时返回空台账，不报错。"""
-    if not os.path.exists(HISTORY_FILE):
-        LOG.info("未找到 %s，按空台账处理（首次运行属正常）", os.path.basename(HISTORY_FILE))
-        return {}
-    try:
-        with open(HISTORY_FILE, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-    except (OSError, json.JSONDecodeError) as exc:
-        LOG.warning("解析 %s 失败（%s），按空台账处理", os.path.basename(HISTORY_FILE), exc)
-        return {}
-
-    urls = data.get("urls") if isinstance(data, dict) else None
-    if not isinstance(urls, dict):
-        LOG.warning("%s 结构不符合预期，按空台账处理", os.path.basename(HISTORY_FILE))
-        return {}
-
-    return {str(k): str(v) for k, v in urls.items()}
-
-
-def save_history(history: dict[str, str]) -> None:
-    """写回台账，超出 MAX_HISTORY 时按记录日期淘汰最旧。"""
-    items = sorted(history.items(), key=lambda kv: kv[1], reverse=True)
-    trimmed = dict(items[:MAX_HISTORY])
-    if len(items) > MAX_HISTORY:
-        LOG.info("台账超出 %d 条，淘汰最旧的 %d 条", MAX_HISTORY, len(items) - MAX_HISTORY)
-
-    payload = {
-        "updated_at": datetime.now(BEIJING_TZ).strftime("%Y-%m-%d"),
-        "urls": trimmed,
-    }
-    with open(HISTORY_FILE, "w", encoding="utf-8") as fh:
-        json.dump(payload, fh, ensure_ascii=False, indent=2, sort_keys=True)
-        fh.write("\n")
-    LOG.info("已更新 %s，当前共 %d 条记录", os.path.basename(HISTORY_FILE), len(trimmed))
-
-
-# ---------------------------------------------------------------------------
-# Tavily 检索
-# ---------------------------------------------------------------------------
-
-@dataclass
-class Candidate:
-    title: str
-    url: str
-    normalized_url: str
-    content: str
-    published_date: str
-    source_query: str
-    lang: str
-
-
-def _search_once(client: TavilyClient, spec: dict[str, Any]) -> dict[str, Any]:
-    """带重试的单条检索。"""
-    params: dict[str, Any] = {
-        "query": spec["query"],
-        "topic": spec.get("topic", "news"),
-        "time_range": SEARCH_TIME_RANGE,
-        "search_depth": SEARCH_DEPTH,
-        "max_results": SEARCH_MAX_RESULTS,
-        "exclude_domains": EXCLUDE_DOMAINS,
-    }
-    if spec.get("include_domains"):
-        params["include_domains"] = spec["include_domains"]
-
-    last_exc: Exception | None = None
-    for attempt in range(1, SEARCH_RETRIES + 1):
-        try:
-            return client.search(**params)
-        except Exception as exc:  # noqa: BLE001 - 需要兜住 SDK 的各路异常
-            last_exc = exc
-            if attempt < SEARCH_RETRIES:
-                LOG.warning(
-                    "检索失败（第 %d/%d 次）：%s: %s，%d 秒后重试",
-                    attempt, SEARCH_RETRIES, type(exc).__name__, exc, SEARCH_RETRY_BACKOFF,
-                )
-                time.sleep(SEARCH_RETRY_BACKOFF)
-
-    raise RuntimeError(f"检索持续失败：{type(last_exc).__name__}: {last_exc}") from last_exc
-
-
-def search_all(api_key: str, queries: list[dict[str, Any]]) -> list[Candidate]:
-    """跑完所有查询并去重。
-
-    单条查询失败不影响其余 —— 一条挂掉不该让整期周报开天窗。
+    两道判据，命中任一即删：
+      1. **模型自己的否定式自述**（SELF_DISQUALIFY_RE）—— 主判据。它都写了
+         "因此不将其作为新品或结构改款处理"，这条就不该占一个条目。
+      2. **URL 命中促销特征**（url_promo_reason）—— 补充。用在模型没写自述、
+         直接当成正常新品写出来的情况（r7 里 Anker 那条就是这样）。
     """
-    client = TavilyClient(api_key=api_key)
-    found: dict[str, Candidate] = {}
+    hit = SELF_DISQUALIFY_RE.search(chunk)
+    if hit:
+        return f"模型自述非新品：「{hit.group(0)}」"
+    for url in MARKDOWN_LINK_RE.findall(chunk):
+        reason = url_promo_reason(url)
+        if reason:
+            return f"URL 促销特征「{reason}」：{url}"
+    return None
 
-    for spec in queries:
-        query = spec["query"]
-        try:
-            response = _search_once(client, spec)
-        except Exception as exc:  # noqa: BLE001
-            LOG.warning("查询「%s」失败，跳过：%s", query, exc)
-            continue
 
-        # SDK 用 setdefault 保证了 results 键存在，但可能是空列表。
-        results = response.get("results") or []
-        if not results:
-            LOG.warning("查询「%s」没有返回结果", query)
-            continue
+def group_blocks(text: str) -> list[list[str]]:
+    """把正文按标题切成块：每个 `## ` / `### ` 行起一块，后续行归入该块。
 
-        added = 0
-        skipped_junk = 0
-        for item in results:
-            raw_url = str(item.get("url") or "")
-            normalized = normalize_url(raw_url)
-            if not normalized:
+    `## ` 与 `### ` 都起新块，所以一个 `### ` 块里不会混进 `## ` 标题行 ——
+    下面两个过滤器都依赖这一点来判断"这一块是不是能整块删的条目块"。
+    """
+    blocks: list[list[str]] = []
+    for line in text.split("\n"):
+        if line.startswith("## ") or line.startswith("### "):
+            blocks.append([line])
+        elif blocks:
+            blocks[-1].append(line)
+        else:
+            blocks.append([line])
+    return blocks
+
+
+def drop_promo_blocks(text: str, where: str) -> tuple[str, list[str]]:
+    """丢掉促销/折扣稿与被模型自己否定的 `### ` 条目块。
+
+    返回 (清理后的正文, 被丢掉条目里的全部 URL) —— URL 交给调用方拼进下一轮提示，
+    让模型补漏时不要再把同一批折扣稿捞回来。
+
+    只丢 `### ` 开头的条目块，**不动 `## ` 标题行与正文段落** ——
+    标题是本地用来定位板块的，删掉会让整份报告层级塌掉；段落删掉会连带丢掉
+    同段里的真情报。所以非 `### ` 块里若残留命中内容，只告警不删，留给人工看一眼。
+    """
+    blocks = group_blocks(text)
+
+    kept: list[str] = []
+    dropped: list[str] = []
+    for block in blocks:
+        chunk = "\n".join(block)
+        if chunk.lstrip().startswith("### "):
+            reason = block_drop_reason(chunk)
+            if reason:
+                LOG.warning("[%s] 丢弃条目（%s）｜ 标题：%s",
+                            where, reason, block[0].lstrip("# ").strip()[:50])
+                dropped.extend(MARKDOWN_LINK_RE.findall(chunk))
                 continue
-            if normalized in found:
-                continue
-            if is_low_value_url(normalized):
-                skipped_junk += 1
-                LOG.info("丢弃低价值页面（促销/店铺/下载/聚合页）：%s", normalized[:110])
-                continue
-            found[normalized] = Candidate(
-                title=str(item.get("title") or "").strip(),
-                url=raw_url,
-                normalized_url=normalized,
-                content=str(item.get("content") or "").strip(),
-                # published_date 是 beta 字段，探测不到时为 None，必须容错。
-                published_date=str(item.get("published_date") or ""),
-                source_query=query,
-                lang=spec.get("lang", ""),
-            )
-            added += 1
+        kept.append(chunk)
 
-        LOG.info("查询「%s」返回 %d 条，新增 %d 条，丢弃低价值 %d 条",
-                 query, len(results), added, skipped_junk)
-
-    LOG.info("本轮共获得 %d 条不重复候选资讯", len(found))
-    return list(found.values())
+    cleaned = "\n".join(kept)
+    for block in cleaned.split("\n\n"):
+        if block.lstrip().startswith("### "):
+            continue  # 上面已经过了一遍，这里只查删不掉的那些
+        reason = block_drop_reason(block)
+        if reason:
+            LOG.warning("[%s] 命中促销/非新品特征但位于无法整块删除的位置（%s），"
+                        "请人工确认：%s", where, reason, block.strip()[:80])
+    return cleaned, dropped
 
 
-# ---------------------------------------------------------------------------
-# 大模型提炼
-# ---------------------------------------------------------------------------
+def block_repeat_reason(chunk: str, seen: dict[str, str]) -> str | None:
+    """一个 `### ` 条目块是不是上周已经推送过？是则返回理由，否则 None。
 
-SYSTEM_PROMPT = f"""你是一名储能行业分析师，服务于华宝新能（Jackery）的储能结构工程师团队。
-你的任务是把检索到的原始资讯，提炼成一份每周行业情报，供结构工程师快速掌握竞品动向与技术趋势。
-读者是工程师，时间有限 —— 结论先行、信息密度高、不写套话。
+    判据：**该块的全部链接（归一化后）都在台账里**。只要有一条链接没推过就保留 ——
+    宁可漏去重，也不要因为块里恰好引了一篇旧文就丢掉一条含新情报的条目。
 
-必须严格输出如下 JSON 结构（只输出 JSON，不要任何解释文字，不要 Markdown 代码围栏）：
-{{
-  "highlights": ["竞品：一句话", "结构：一句话", "法规：一句话"],
-  "categories": [
-    {{"name": "{CATEGORY_COMPETITOR}", "items": [
-      {{"title": "...", "insight": "...", "jackery_angle": "...", "url": "..."}}]}},
-    {{"name": "{CATEGORY_STRUCTURE}", "items": [
-      {{"title": "...", "insight": "...", "url": "..."}}]}},
-    {{"name": "{CATEGORY_REGULATION}", "summary": "一整段话", "sources": [
-      {{"title": "...", "url": "..."}}]}}
-  ],
-  "product_line_updates": ["本期看到的、不在下方清单里的华宝产品线名"]
-}}
-
-★ 三个分类的处理方式**各不相同**，请严格按下面来：
-
-一、【{CATEGORY_COMPETITOR}】逐条展开，每条都要有对标
-   收录 EcoFlow、Anker、Bluetti 及国内厂商（正浩、德兰明海、安克创新、大疆等）的新品发布、
-   形态创新、价格与渠道动作。每条输出 title / insight / jackery_angle / url 四个字段。
-
-二、【{CATEGORY_STRUCTURE}】逐条展开，只写结构视角
-   收录外壳防跌落与抗冲击、IP 防护等级、Pack 结构与模组堆叠、热管理与风道、
-   阻燃材料与结构件工艺、可维修性与装配方式。每条只输出 title / insight / url。
-
-三、【{CATEGORY_REGULATION}】**绝对不要逐条列条目**
-   把本期所有法规/标准/出海相关内容（UL 2743、欧洲阳台储能 Balkonkraftwerk 安装规范、
-   各国并网与出口认证、关税与贸易政策）合并成**一整段话**写进 summary 字段。
-   读者不会一条条点开法规新闻 —— 他们要的是"这周监管面发生了什么变化、对我们意味着什么"。
-   summary 写 100~180 字，讲清三件事：涉及哪些市场 / 规则具体怎么变 / 对储能产品设计或出海的影响。
-   不要写成"某某网站报道了……"，直接给结论。
-   另外**最多挑 3 条**最值得追溯原文的放进 sources（只有 title 和 url 两个字段）。
-   本期确实没有法规相关内容时，summary 写"本期无"，sources 返回 []。
-
-字段要求：
-- highlights：3 条，分别对应上面三个分类，每条一句话（25 字以内）点出本期最值得注意的变化，
-  开头用「竞品：」「结构：」「法规：」标注。某一类没有内容就写「竞品：本期无」。
-- title：中文标题，简洁准确，一句话说清这条资讯是什么。不要加方括号前缀。
-- insight：1~2 句，从**结构工程视角**切入 —— 外壳、模组、散热、防护、装配工艺、材料、公差、可靠性。
-  不要复述原文，不要写"该文章介绍了……"这类空话。
-- jackery_angle：**仅竞品分类可能用到。有就写，没有就返回空字符串 ""** ——
-  这是可选项，**不要为了凑满这个字段而硬编一段话**。按下面的优先级取材：
-  ① 这条动态若能对上华宝某条具体产品线、某个形态或容量段 —— 先写对标，再写结构层面的
-     借鉴点或风险点。对标只能引用下面产品清单里列出的产品线，清单外的型号一律不要编造。
-  ② 若对不上具体产品线，但整个行业的形态变化对结构设计有普适启示（装配方式、散热路线、
-     防护思路、材料选型），就写这层**宏观经验借鉴**，不必强行扯到某款产品。
-  ③ 两者都不成立（纯渠道动作、纯资本面、纯人事变动）—— 留空字符串 ""。
-  总长 60 字以内。**宁缺毋滥：硬凑的对标比没有对标更糟。**
-- url / sources[].url：必须**原样复制**输入列表中给出的 URL，一个字都不要改。
-  绝对不要自己编造或拼接链接。
-
-另外单独返回一个字段（它不进周报正文，只给维护者看）：
-- product_line_updates：本期资讯里提到的、**属于华宝新能/Jackery 但不在下方产品清单里**的
-  产品线或产品名。用途是提醒维护者该更新清单了。只填你能从原文确认属于华宝的，
-  拿不准的一律不要填。没有就返回 []。
-
-华宝新能 / Jackery 在售产品线（jackery_angle 只能引用这里列出的产品线）：
-{JACKERY_PRODUCTS}
-
-归类规则：
-- 同一条资讯只放进最贴切的一个分类，不要重复收录。
-- 全部候选都无法归入任何分类时，前两个分类的 items 返回 []，法规 summary 写"本期无"。
-
-收录标准：宁缺毋滥，以下几类一律丢弃 ——
-- **纯折扣/促销稿**：只讲"降价了、打几折、哪里买得到"，不含产品形态或技术信息的。
-- **厂商自营页与营销内容**：链接指向品牌官网产品页、电商店铺页、SEO 软文或官方博客的自我推介文章，
-  而非第三方媒体报道的。
-- **自动生成页**：链接带随机地址参数、或明显由模板批量生成的聚合页、榜单页、导航页。
-- **与储能/便携电源/阳台储能无关的内容**：汽车、消费电子、通用半导体、食品、政务等。
-- **纯资本面稿件**：股价、概念股炒作、财报数字罗列。
-  例外：如果财报或公告披露了产品线规划、技术路线、认证资质（如 IP 等级、UL 认证）
-  等实质性工程信息，可以收录，insight 要写这些工程信息而非财务数字。
-
-另外：结构工程师更关心"产品怎么做的"而不是"卖多少钱"。同等条件下，
-优先收录新产品与新形态、结构与热管理技术、法规标准变化。
-"""
-
-
-@dataclass
-class NewsItem:
-    title: str
-    insight: str
-    url: str
-    # 仅竞品分类有值：与华宝对应产品线的对标 + 借鉴点。
-    jackery_angle: str = ""
-
-
-@dataclass
-class Digest:
-    """一期周报的内容。三个分类的处理方式不同，所以不共用一个结构。"""
-
-    # 顶部"本周速览"的三句结论，可空。
-    highlights: list[str]
-    # 逐条展开的分类：[(分类名, 条目), ...]，固定为竞品、结构两类。
-    sections: list[tuple[str, list[NewsItem]]]
-    # 法规类不逐条列，只留一段综述 + 少量溯源链接 [(标题, URL), ...]。
-    regulation_summary: str
-    regulation_sources: list[tuple[str, str]]
-    # 本期出现的、不在 JACKERY_PRODUCTS 里的华宝产品线。不进周报，只用于提醒维护者更新清单。
-    product_line_updates: list[str]
-
-    @property
-    def total_items(self) -> int:
-        return sum(len(items) for _, items in self.sections)
-
-    @property
-    def regulation_filled(self) -> bool:
-        return self.regulation_summary.strip() not in _PLACEHOLDER_TEXT
-
-    def is_empty(self) -> bool:
-        """整期没有任何实质内容。
-
-        "本期无"是提示词约定的占位说法，不算内容 —— 否则检索命中一堆垃圾时，
-        模型按约定返回占位词，这条空周报照样会被推出去。
-        """
-        return self.total_items == 0 and not self.regulation_filled
-
-    def consistent_highlights(self) -> list[str]:
-        """丢掉指向空小节的速览条目。
-
-        实测会撞上：模型在速览里写了「法规：欧洲多国放开阳台光伏」，
-        正文的法规综述却返回空字符串 —— 速览承诺了、正文没有，读起来像坏了。
-        速览条目的前缀（竞品/结构/法规）是提示词约定的，据此就能对上小节。
-        识别不出前缀的条目原样保留，不做无根据的推断。
-        """
-        filled = {
-            "竞品": bool(self.sections[0][1]) if len(self.sections) > 0 else False,
-            "结构": bool(self.sections[1][1]) if len(self.sections) > 1 else False,
-            "法规": self.regulation_filled,
-        }
-
-        kept, dropped = [], []
-        for highlight in self.highlights:
-            for prefix, has_content in filled.items():
-                if highlight.startswith(prefix):
-                    (kept if has_content else dropped).append(highlight)
-                    break
-            else:
-                kept.append(highlight)
-
-        if dropped:
-            LOG.warning(
-                "速览里有 %d 条指向了空小节，已丢弃以免前后不一致：%s",
-                len(dropped), "；".join(dropped),
-            )
-        return kept
-
-
-def build_user_prompt(candidates: list[Candidate]) -> str:
-    lines = [
-        "以下是本周检索到的候选资讯，请按系统提示的要求提炼归类。",
-        f"共 {len(candidates)} 条候选，每条格式为：[编号] 标题 / 链接 / 摘要片段。",
-        "",
+    ⚠️ 第一行的 `if not urls` 不是防御性代码，是**必需的**：`all()` 对空列表恒为 True，
+    少了这一行，所有**不带链接**的 `### ` 块会在第一次运行就被删光。
+    这不是假想 —— r2.md 3 个块、r3.md 2/3、r4.md 2/3、r7.md 1/3 都没有链接，
+    其中"国家电投 100MW/200MWh 一期并网"是真新闻。
+    """
+    urls = [
+        url for url in MARKDOWN_LINK_RE.findall(chunk)
+        if not is_index_page_url(url)      # 聚合页不进台账，也就不该参与判定
     ]
-    for idx, item in enumerate(candidates, start=1):
-        lines.append(f"[{idx}] 标题：{item.title}")
-        lines.append(f"    链接：{item.url}")
-        if item.published_date:
-            lines.append(f"    发布时间：{item.published_date}")
-        snippet = re.sub(r"\s+", " ", item.content)[:400]
-        if snippet:
-            lines.append(f"    摘要：{snippet}")
-        lines.append("")
-    lines.append("请输出 JSON。")
-    return "\n".join(lines)
-
-
-def _extract_json(raw: str) -> dict[str, Any]:
-    """解析模型返回的 JSON。先尝试剥掉 Markdown 代码围栏再解析。"""
-    text = (raw or "").strip()
-    if not text:
-        raise ValueError("模型返回了空内容")
-
-    fenced = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, re.S)
-    if fenced:
-        text = fenced.group(1).strip()
-
-    return json.loads(text)
-
-
-def call_llm(cfg: dict[str, str], candidates: list[Candidate]) -> dict[str, Any]:
-    # 默认超时是 10 分钟，对每周一次的定时任务太长 —— 卡住会白烧 runner 时间。
-    client = OpenAI(
-        api_key=cfg["OPENAI_API_KEY"],
-        base_url=cfg["OPENAI_BASE_URL"],
-        timeout=60.0,
-        max_retries=2,
-    )
-
-    response = client.chat.completions.create(
-        model=cfg["OPENAI_MODEL"],
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_user_prompt(candidates)},
-        ],
-        # DeepSeek 只支持 json_object，不支持 json_schema。
-        # 第三方网关存在"静默丢弃 response_format"的已知问题，
-        # 所以提示词里已写明 JSON 结构，且下面还有解析与字段校验兜底。
-        response_format={"type": "json_object"},
-        temperature=0.3,
-    )
-
-    raw = (response.choices[0].message.content or "").strip()
-    try:
-        return _extract_json(raw)
-    except (json.JSONDecodeError, ValueError) as exc:
-        LOG.error("模型输出无法解析为 JSON：%s", exc)
-        LOG.error("原始输出（前 1000 字符）：%s", raw[:1000])
-        raise
-
-
-def validate_digest(data: dict[str, Any], candidates: list[Candidate]) -> Digest:
-    """校验模型输出，过滤掉编造的链接，组装成 Digest。"""
-    by_normalized = {c.normalized_url: c for c in candidates}
-
-    raw_categories = data.get("categories")
-    if not isinstance(raw_categories, list):
-        raise ValueError("模型输出的 categories 字段缺失或类型不对")
-
-    # 把模型返回的分类名映射到固定分类。允许模型带【】或多余空格。
-    def canonicalize(name: Any) -> str | None:
-        cleaned = re.sub(r"[\[\]【】\s]", "", str(name or ""))
-        if not cleaned:
-            return None
-        for category in CATEGORIES:
-            if cleaned == re.sub(r"[\[\]【】\s]", "", category):
-                return category
-        for category in CATEGORIES:
-            core = re.sub(r"[\[\]【】\s]", "", category)
-            if core and (core in cleaned or cleaned in core):
-                return category
+    if not urls:
         return None
+    dates = [seen[normalize_url(url)] for url in urls if normalize_url(url) in seen]
+    if len(dates) != len(urls):
+        return None
+    latest = max(d for d in dates if d) if any(dates) else ""
+    return f"全部链接均已推送过（最近 {latest or '未知日期'}）"
 
-    collected: dict[str, list[NewsItem]] = {category: [] for category in CATEGORIES}
-    regulation_summary = ""
-    regulation_sources: list[tuple[str, str]] = []
-    seen_urls: set[str] = set()
-    dropped_duplicate = 0
-    dropped_fabricated = 0
-    dropped_malformed = 0
 
-    def resolve_url(raw_url: Any) -> Candidate | None:
-        """URL 白名单校验：模型可能编造或改写链接，只接受候选集里真实存在的。
+def _section_of_blocks(text: str) -> tuple[list[list[str]], list[tuple[str, str]]]:
+    """切块并给每块标注 (类型, 所属二级标题)。
 
-        同时做去重 —— 模型偶尔会把一篇文章拆成几条不同角度的"资讯"输出重复链接，
-        那种重复在周报里很扎眼。
-        """
-        nonlocal dropped_duplicate, dropped_fabricated
-        url = str(raw_url or "").strip()
-        if not url:
-            return None
-        candidate = by_normalized.get(normalize_url(url))
-        if candidate is None:
-            dropped_fabricated += 1
-            LOG.warning("丢弃疑似编造链接：%s", url[:120])
-            return None
-        if candidate.normalized_url in seen_urls:
-            dropped_duplicate += 1
-            LOG.info("丢弃重复链接：%s", candidate.url[:120])
-            return None
-        seen_urls.add(candidate.normalized_url)
-        return candidate
+    返回 (块列表, [(类型, 二级标题), ...])，类型取值 'h2' / 'h3' / 'other'。
+    所属二级标题用于两个判断：空板块守卫、以及"板块五永远不删"。
+    """
+    blocks = group_blocks(text)
+    tags: list[tuple[str, str]] = []
+    current_h2 = ""
+    for block in blocks:
+        stripped = "\n".join(block).lstrip()
+        if stripped.startswith("## "):
+            current_h2 = stripped.split("\n", 1)[0].strip()
+            tags.append(("h2", current_h2))
+        elif stripped.startswith("### "):
+            tags.append(("h3", current_h2))
+        else:
+            tags.append(("other", current_h2))
+    return blocks, tags
 
-    for entry in raw_categories:
-        if not isinstance(entry, dict):
+
+def drop_repeat_blocks(
+    text: str, where: str, seen: dict[str, str]
+) -> tuple[str, list[str]]:
+    """丢掉上周已经推送过的 `### ` 条目块（代码硬兜底，是三道去重里最硬的一道）。
+
+    返回 (清理后的正文, 被丢掉条目的标题列表)。**注意返回值与促销过滤器完全分开**：
+    这里的标题不能混进 `banned_urls` —— 那一批是"折扣稿黑名单"，混进去等于告诉模型
+    这些是真新闻的反面，会让它连带躲开整个域名。
+
+    只删 `### ` 块。板块四（短段落）与板块五（bullet）没有 `### ` 块，代码够不着，
+    它们靠提示词，这里只对够得着的部分之外的段落打个 WARNING 交人工看一眼。
+    """
+    if not seen:
+        return text, []
+
+    blocks, tags = _section_of_blocks(text)
+
+    reasons: dict[int, str] = {}
+    for index, block in enumerate(blocks):
+        kind, section = tags[index]
+        if kind != "h3":
             continue
-        category = canonicalize(entry.get("name"))
-        if category is None:
-            LOG.warning("模型返回了未知分类「%s」，其条目已丢弃", entry.get("name"))
+        # 板块五的链接天然是板块一的子集，判定必然命中 —— 永久跳过，别删也别告警。
+        if section == SECTION_FIVE_HEADING:
             continue
+        reason = block_repeat_reason("\n".join(block), seen)
+        if reason:
+            reasons[index] = reason
 
-        # 法规类走 summary + sources，与前两类结构不同。
-        if category == CATEGORY_REGULATION:
-            regulation_summary = str(entry.get("summary") or "").strip()
-            raw_sources = entry.get("sources")
-            if isinstance(raw_sources, list):
-                for raw_source in raw_sources:
-                    if not isinstance(raw_source, dict):
-                        dropped_malformed += 1
-                        continue
-                    title = str(raw_source.get("title") or "").strip()
-                    candidate = resolve_url(raw_source.get("url"))
-                    if not title or candidate is None:
-                        dropped_malformed += 1
-                        continue
-                    if len(regulation_sources) >= MAX_REGULATION_SOURCES:
-                        continue
-                    regulation_sources.append((title, candidate.url))
+    # 空板块守卫：一个板块的条目被删光会推出去一个只有标题的空壳。
+    # 那种情况下整段恢复 —— 重复总好过空白。
+    by_section: dict[str, list[int]] = {}
+    for index, (kind, section) in enumerate(tags):
+        if kind == "h3":
+            by_section.setdefault(section, []).append(index)
+    for section, indices in by_section.items():
+        if indices and all(i in reasons for i in indices):
+            LOG.warning("[%s] 板块 %r 的条目会被全部删光，已整段恢复 —— "
+                        "重复好过推一个空板块，请人工看一眼这周是不是真的没有新动态",
+                        where, section)
+            for index in indices:
+                reasons.pop(index, None)
+
+    dropped: list[str] = []
+    kept: list[str] = []
+    for index, block in enumerate(blocks):
+        chunk = "\n".join(block)
+        kind, section = tags[index]
+        if index in reasons:
+            title = block[0].lstrip("# ").strip()[:50]
+            LOG.warning("[%s] 丢弃重复条目（%s）｜ 标题：%s",
+                        where, reasons[index], title)
+            dropped.append(title)
             continue
+        # 代码够不着的位置（板块四的短段落等）只告警，不删 —— 段落里往往混着同段
+        # 的真情报，删了会连带丢掉。板块五跳过：它引用板块一的链接是设计要求，
+        # 每周都会命中，告警只会变成噪音。
+        if kind == "other" and section != SECTION_FIVE_HEADING:
+            if block_repeat_reason(chunk, seen):
+                LOG.warning("[%s] 段落命中已推送过的链接，但段落无法整块删除，"
+                            "请人工确认：%s", where, chunk.strip()[:80])
+        kept.append(chunk)
 
-        items = entry.get("items")
-        if not isinstance(items, list):
+    return "\n".join(kept), dropped
+
+
+def fetch_section1(
+    cfg: dict[str, str], today: datetime, history: list[dict]
+) -> str:
+    """板块一：两轮调用。
+
+    第一轮把检索预算全压在这一个板块上；第二轮带上第一轮的原文，要求补漏并合并成
+    最终一份。**两轮结果不做本地拼接** —— 拼接会得到两份互相重复、口径不一的板块。
+    """
+    first, _ = call_openrouter(
+        cfg,
+        [
+            {"role": "system", "content": SECTION1_SYSTEM_PROMPT},
+            {"role": "user", "content": build_section1_user_prompt(today, history)},
+        ],
+        label="板块一·第一轮",
+    )
+    if not first:
+        raise RuntimeError("板块一第一轮返回了空正文")
+    LOG.info("板块一第一轮完成：%d 字", len(first))
+
+    # 在第一轮的结果上先拦一道：被剔除的链接会作为黑名单写进第二轮的提示，
+    # 防止补漏时从同一批检索结果里再把同一篇折扣稿捞回来。
+    first, banned = drop_promo_blocks(first, "板块一第一轮")
+
+    seen = seen_url_map(history)
+    merged, _ = call_openrouter(
+        cfg,
+        [
+            {"role": "system", "content": SECTION1_MERGE_SYSTEM_PROMPT},
+            {"role": "user",
+             "content": build_section1_merge_user_prompt(
+                 today, first, banned, history, seen
+             )},
+        ],
+        label="板块一·第二轮",
+    )
+    if not merged:
+        raise RuntimeError("板块一第二轮返回了空正文")
+    LOG.info("板块一第二轮（补漏+合并）完成：%d 字", len(merged))
+
+    # 第二道：第二轮是新检索 + 重新组织，可能引入第一轮没有的折扣稿，必须再过一遍。
+    merged, banned2 = drop_promo_blocks(merged, "板块一第二轮")
+    if banned2:
+        LOG.info("板块一最终剔除促销条目 %d 条", len(banned2))
+
+    # 第三道（最硬）：跨周重复。放在促销过滤之后 —— 先删掉这批折扣稿再判重复，
+    # 免得一份"上周推过、这周又打折"的内容走两条路径被记两次。
+    merged, repeated = drop_repeat_blocks(merged, "板块一", seen)
+    if repeated:
+        LOG.info("板块一剔除跨周重复条目 %d 条", len(repeated))
+    return merged
+
+
+def build_report(
+    cfg: dict[str, str], today: datetime, history: list[dict] | None = None
+) -> tuple[str, list[str]]:
+    """取回正文并组装成最终报告。返回 (完整 Markdown, 引用链接列表)。
+
+    共三次调用：板块一两轮（fetch_section1）+ 其余板块一轮。板块一必须先跑 ——
+    板块五（对华宝的启发）需要知道便携竞品这周发生了什么，要把它作为参考喂进主调用。
+    """
+    seen = seen_url_map(history or [])
+    section1 = strip_model_heading(fetch_section1(cfg, today, history or []))
+    # 安全网：板块一的标题由本地定位，模型跑偏了就自己补上，否则整份报告的层级会乱。
+    if SECTION1_HEADING not in section1:
+        LOG.warning("板块一的输出里没有 %r，已补上标题", SECTION1_HEADING)
+        section1 = f"{SECTION1_HEADING}\n\n{section1}"
+
+    rest, citations = call_openrouter(
+        cfg,
+        [
+            {"role": "system", "content": MAIN_SYSTEM_PROMPT},
+            {"role": "user", "content": build_user_prompt(today, section1, history or [])},
+        ],
+        label="板块二~五",
+    )
+    if not rest:
+        raise RuntimeError("主调用返回了空正文")
+    rest = strip_model_heading(rest)
+    # 促销稿不只出现在板块一（板块二、三同样是厂商条目）。同一套规则再过一遍。
+    rest, _ = drop_promo_blocks(rest, "板块二~五")
+    # 跨周重复同理，板块二、三也有 `### ` 条目块，代码兜底够得着。
+    rest, repeated = drop_repeat_blocks(rest, "板块二~五", seen)
+    if repeated:
+        LOG.info("板块二~五剔除跨周重复条目 %d 条", len(repeated))
+
+    start, end = _window(today)          # 唯一来源，别在这里重算
+    header = (
+        f"# {DINGTALK_KEYWORD} 储能结构周报（{today.strftime('%Y-%m-%d')}）\n\n"
+        f"> 覆盖周期：{start} ~ {end} ｜ 面向储能结构工程师\n\n"
+    )
+
+    body = f"{section1}\n\n{rest}"
+
+    # 安全网：模型偶尔会忘掉正文里的链接。它自己返回的 citations 是真实检索结果，
+    # 拿来补一段参考来源，总好过整份报告一个可点的链接都没有。
+    if not has_markdown_link(body) and citations:
+        LOG.warning("正文里没有任何 Markdown 链接，用 citations 补一段参考来源")
+        body += "\n\n## 参考来源\n\n" + "\n".join(
+            f"- <{url}>" for url in citations[:20]
+        )
+
+    # 安全网之二：关键词必须出现在正文里，否则钉钉会以 310000 整条拒收。
+    # header 里一定有关键词，所以这里实际是在兜底"header 被改坏"的极端情况。
+    if DINGTALK_KEYWORD not in header + body:
+        LOG.warning("正文里没有 %s，已在标题中补上", DINGTALK_KEYWORD)
+        header = (
+            f"# {DINGTALK_KEYWORD} 储能结构周报（{today.strftime('%Y-%m-%d')}）\n\n"
+            + header.split("\n\n", 1)[-1]
+        )
+
+    # 安全网之三（硬性约束 4 用在一个原本没人管的地方）：五个板块必须齐全且非空。
+    # 放宽到 14 天窗口 + 加了去重之后正文变短的概率明显上升，而**被截断的正好是
+    # 末尾的板块四、五**（finish_reason 以前从不检查）。不查的话会推出去一份
+    # 缺板块的报告，退出码还是 0，谁也发现不了。
+    report = header + body
+    _assert_all_sections(report)
+
+    return report, citations
+
+
+def _assert_all_sections(report: str) -> None:
+    """五个板块标题齐全、且每个板块都有内容。缺任何一个就非 0 退出。
+
+    板块四/五是"短段落 / bullet"形态，没有 `### ` 块，所以判据是"标题之后到下一个
+    二级标题之前有非空行"。**不要**把它换成"必须有 `### `" —— 那会误判板块四、五。
+    """
+    blocks = group_blocks(report)
+    found: dict[str, int] = {}
+    current = ""
+    for block in blocks:
+        chunk = "\n".join(block)
+        stripped = chunk.lstrip()
+        if stripped.startswith("## "):
+            current = stripped.split("\n", 1)[0].strip()
+            found.setdefault(current, 0)
+            # ⚠️ 这里**不能 continue**：`group_blocks` 只按标题行起新块，
+            # 所以板块四、五的散文正文和它们的 `## ` 标题行是**同一个块**。
+            # 早退会把这些正文全漏掉，把有内容的板块误判成空板块并拒绝推送。
+        elif not current:
             continue
+        # 标题行本身不算内容，只数它下面的非空行。
+        body_lines = [
+            line for line in chunk.split("\n")
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        found[current] += len(body_lines)
 
-        for raw_item in items:
-            if not isinstance(raw_item, dict):
-                dropped_malformed += 1
-                continue
+    missing = [h for h in SECTION_HEADINGS if h not in found]
+    empty = [h for h in SECTION_HEADINGS if h in found and found[h] == 0]
+    if not missing and not empty:
+        return
 
-            title = str(raw_item.get("title") or "").strip()
-            insight = str(raw_item.get("insight") or "").strip()
-            if not title or not insight:
-                dropped_malformed += 1
-                continue
-
-            candidate = resolve_url(raw_item.get("url"))
-            if candidate is None:
-                continue
-
-            if len(collected[category]) >= MAX_ITEMS_PER_CATEGORY:
-                continue
-
-            collected[category].append(NewsItem(
-                title=title,
-                insight=insight,
-                url=candidate.url,
-                jackery_angle=str(raw_item.get("jackery_angle") or "").strip(),
-            ))
-
-    if dropped_malformed:
-        LOG.warning("丢弃 %d 条字段不完整的条目", dropped_malformed)
-    if dropped_fabricated:
-        LOG.warning("丢弃 %d 条链接不在候选集内的条目（疑似模型编造）", dropped_fabricated)
-    if dropped_duplicate:
-        LOG.info("丢弃 %d 条重复链接的条目", dropped_duplicate)
-
-    raw_highlights = data.get("highlights")
-    highlights = [
-        str(h).strip() for h in raw_highlights
-        if isinstance(raw_highlights, list) and str(h).strip()
-    ][:len(CATEGORIES)]
-
-    raw_updates = data.get("product_line_updates")
-    product_line_updates = [
-        str(u).strip() for u in raw_updates
-        if isinstance(raw_updates, list) and str(u).strip()
-    ][:MAX_PRODUCT_UPDATES]
-
-    # 注意：这里不因"一条都没留下"而报错。
-    # 模型把全部候选判为无关是**合法**结果（检索命中一堆垃圾时就会这样），
-    # 这属于"本周没有相关资讯"，交给 main() 走无新增分支；
-    # 只有上面的结构性问题（categories 缺失/类型不对）才算真错误。
-    return Digest(
-        highlights=highlights,
-        sections=[(c, collected[c]) for c in CATEGORIES if c != CATEGORY_REGULATION],
-        regulation_summary=regulation_summary,
-        regulation_sources=regulation_sources,
-        product_line_updates=product_line_updates,
+    detail = []
+    if missing:
+        detail.append("缺少板块：" + "、".join(missing))
+    if empty:
+        detail.append("板块为空：" + "、".join(empty))
+    sys.exit(
+        "❌ 报告结构不完整，拒绝推送：\n   "
+        + "\n   ".join(detail)
+        + "\n   五个板块必须齐全且非空（硬性约束 2）。常见原因是模型输出被 "
+        "max_tokens 截断（看日志里有没有 finish_reason=length 的 WARNING），"
+        "或去重把某个板块清空了。"
     )
 
 
 # ---------------------------------------------------------------------------
-# Markdown 渲染
+# 消息分段
 # ---------------------------------------------------------------------------
 
-def _byte_len(text: str) -> int:
-    return len(text.encode("utf-8"))
+def _cut_to_bytes(text: str, limit: int) -> tuple[str, str]:
+    """把字符串按 UTF-8 字节数切成 (不超过 limit 的前半, 剩余)。
 
-
-def render_item(index: int, item: NewsItem) -> str:
-    # 每条资讯：粗体标题 + 引用块（结构视角 / 对标借鉴）+ 原文链接。
-    # 两个视角行都放进同一个引用块（连续的 > 行在 Markdown 里属于同一个 blockquote），
-    # 视觉上聚成一坨，比拆成两个引用块省纵向空间。
-    lines = [f"**{index}. {item.title}**", ""]
-    if item.insight:
-        lines.append(f"> 结构视角：{item.insight}")
-    if item.jackery_angle:
-        lines.append(f"> 对标借鉴：{item.jackery_angle}")
-    lines += ["", f"[阅读原文]({item.url})", ""]
-    return "\n".join(lines)
-
-
-def render_section(position: int, category: str, items: list[NewsItem]) -> str:
-    numeral = CN_NUMERALS[position - 1] if position <= len(CN_NUMERALS) else str(position)
-    # 标题里带条数，读者一眼知道这个小节要花多久读完。
-    lines = [f"## {numeral}、【{category}】（{len(items)} 条）", ""]
-    if not items:
-        lines.append("本周期暂无相关资讯。")
-        lines.append("")
-        return "\n".join(lines)
-
-    for index, item in enumerate(items, start=1):
-        lines.append(render_item(index, item))
-    return "\n".join(lines)
-
-
-def render_regulation(position: int, summary: str, sources: list[tuple[str, str]]) -> str:
-    """法规类渲染成一整段综述 + 底部溯源链接，不逐条展开。
-
-    读者不会一条条点开法规新闻，所以这里刻意不做条目化排版 ——
-    一段话读完即可，想深挖的再点底部的链接。
+    按字符二分，不会把一个多字节字符劈成两半。
     """
-    numeral = CN_NUMERALS[position - 1] if position <= len(CN_NUMERALS) else str(position)
-    lines = [f"## {numeral}、【{CATEGORY_REGULATION}】", ""]
-    lines.append(summary or "本周期暂无相关资讯。")
-    lines.append("")
-    if sources:
-        links = " ｜ ".join(f"[{title}]({url})" for title, url in sources)
-        lines += [f"**溯源链接**：{links}", ""]
-    return "\n".join(lines)
+    lo, hi = 0, len(text)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if len(text[:mid].encode("utf-8")) <= limit:
+            lo = mid
+        else:
+            hi = mid - 1
+    return text[:lo], text[lo:]
 
 
-def render_header(today: str, days: int, total: int, highlights: list[str]) -> str:
-    period_start = (datetime.now(BEIJING_TZ) - timedelta(days=days)).strftime("%Y-%m-%d")
-    lines = [
-        f"# {DINGTALK_KEYWORD} 储能结构周报（{today}）",
-        "",
-        f"> 覆盖周期：{period_start} ~ {today} ｜ 本期 {total} 条 ｜ 面向储能结构工程师",
-        "",
-    ]
-    # "本周速览"是给读者一个跳过全文的理由：三句话看完就知道这周值不值得细读。
-    # 没有速览时也不留空标题。
-    if highlights:
-        lines += ["**本周速览**", ""]
-        lines += [f"- {h}" for h in highlights]
-        lines.append("")
-    lines.append("")  # 末尾留空行，避免与后面的 ## 标题粘连
-    return "\n".join(lines)
+def split_markdown(text: str, limit: int = MAX_MESSAGE_BYTES) -> list[str]:
+    """按行切分 Markdown，保证每段的 UTF-8 字节数不超过 limit。
 
+    只在行边界切，不会切断链接或表格；单行本身就超限时才按字符硬切。
 
-def plan_messages(
-    header: str,
-    sections: list[tuple[str, list[NewsItem]]],
-    tail: tuple[str, set[str]],
-    footer: str,
-) -> list[tuple[str, set[str]]]:
-    """把周报切成若干条钉钉消息。
-
-    tail 是已经渲染好的法规综述块（正文 + 它包含的 URL），它很短，按整块处理。
-
-    返回 [(消息正文, 该条真正包含的 URL 集合), ...]。
-    只有在拆分导致内容被砍掉时，被砍掉的 URL 才不会出现在集合里 ——
-    这样它们下周还能重新被推送，不会"抓到但没推、以后永远不再提"。
-
-    优先合并成一条：官方对高频场景的推荐做法就是合并成 markdown 摘要。
+    **切分点优先落在 `## ` 板块边界上。** 纯按字节塞满会留下一个很小的尾条，并把
+    同一个板块劈进两条消息 —— 实测 r9.md 就是这样：板块五的"第 1 点"留在上一条，
+    "第 2、3 点"掉进只有 777 字节的尾条，读者在群里看到的板块五是断的。所以一次切分
+    即将超限时，若本段里存在一个 `## ` 行、且切在它前面仍够充实，就切在那里。
+    **这只改变"在哪一行切"，字节上限与行边界两条约束都不变**（硬性约束 3）。
     """
-    tail_text, tail_urls = tail
-    all_urls = {item.url for _, items in sections for item in items} | tail_urls
+    def blen(s: str) -> int:
+        return len(s.encode("utf-8")) + 1                 # +1 是换行符
 
-    rendered = [render_section(i, name, items) for i, (name, items) in enumerate(sections, start=1)]
-    rendered.append(tail_text)
-    full = header + "\n".join(rendered) + footer
+    # 为了对齐板块边界，切点之前至少要留下这么多内容。低于它就宁可按字节切满，
+    # 免得推出去一条只有几百字节的消息。
+    MIN_FILL = limit // 2
 
-    if _byte_len(full) <= MAX_MESSAGE_BYTES:
-        return [(full, all_urls)]
+    chunks: list[str] = []
+    cur: list[str] = []
+    cur_bytes = 0
 
-    # 超长了：拆成"速览+法规一条，之后每个分类一条"。
-    # 第一条刻意做成一分钟能读完的版本（速览 + 法规综述），只看结论的人到这就够了。
-    LOG.info("周报正文 %d 字节，超过 %d 上限，按分类拆分发送", _byte_len(full), MAX_MESSAGE_BYTES)
+    def flush(upto: int) -> None:
+        """把 cur[:upto] 作为一条消息推出，剩下的留给下一条。"""
+        nonlocal cur, cur_bytes
+        head = "\n".join(cur[:upto])
+        if head.strip():
+            chunks.append(head)
+        cur = cur[upto:]
+        cur_bytes = sum(blen(line) for line in cur)
 
-    head_line = header.splitlines()[0]
-    messages: list[tuple[str, set[str]]] = [(header + tail_text, set(tail_urls))]
-    total_parts = len(sections)
+    for line in text.split("\n"):
+        line_bytes = blen(line)
+        if cur and cur_bytes + line_bytes > limit:
+            # 从后往前找最后一个"切在板块开头"的落点，让消息尽量装得满。
+            cut = len(cur)
+            for index in range(len(cur) - 1, 0, -1):
+                if cur[index].startswith("## ") and sum(
+                    blen(part) for part in cur[:index]
+                ) >= MIN_FILL:
+                    cut = index
+                    break
+            flush(cut)
 
-    for position, (category, items) in enumerate(sections, start=1):
-        kept: list[NewsItem] = []
-        for item in items:
-            probe = render_section(position, category, kept + [item])
-            # 留出续页标记的开销。
-            if _byte_len(probe) > MAX_MESSAGE_BYTES - 200:
-                break
-            kept.append(item)
+        # 单行超限（罕见：极长的段落）—— 硬切，避免死循环。
+        while len(line.encode("utf-8")) > limit:
+            head, line = _cut_to_bytes(line, limit)
+            if cur:
+                flush(len(cur))
+            chunks.append(head)
 
-        body = render_section(position, category, kept)
-        # 每条消息都必须带关键词，否则钉钉会以 310000 拦掉后续几条。
-        continuation = f"—— {DINGTALK_KEYWORD} 储能结构周报（续 {position}/{total_parts}）"
-        text = f"{head_line}\n\n{body}\n{continuation}"
+        cur.append(line)
+        cur_bytes += line_bytes
 
-        if _byte_len(text) > MAX_MESSAGE_BYTES:
-            text = text[: MAX_MESSAGE_BYTES // 3] + f"\n\n{continuation}"
+    if cur and "\n".join(cur).strip():
+        chunks.append("\n".join(cur))
+    return chunks
 
-        messages.append((text, {item.url for item in kept}))
 
+def plan_messages(report: str) -> list[str]:
+    """把报告切成若干条钉钉消息。**每条都必须带关键词**，否则会被钉钉整条拒收。
+
+    关键词必须落在 markdown.text 正文里 —— 官方从未说明 title 是否参与校验，
+    社区反馈只放 title 会被 310000 拒收。所以续条要重新带一次关键词，
+    而这里预留出前缀占用的字节，避免加前缀后反而把某条顶过上限。
+    """
+    # 续条前后缀最长的情况（条数固定为两位数以内），留够余量。
+    reserve = len(f"{DINGTALK_KEYWORD} （续 99/99）\n\n".encode("utf-8"))
+    parts = split_markdown(report, limit=MAX_MESSAGE_BYTES - reserve)
+
+    messages: list[str] = []
+    for index, part in enumerate(parts, start=1):
+        if index == 1:
+            text = part
+            if DINGTALK_KEYWORD not in text:
+                # 正常流程里标题已经带了；真缺了就补，别让整条消息因为关键词被拒。
+                LOG.warning("首条消息里没有 %s，已补上", DINGTALK_KEYWORD)
+                text = f"{DINGTALK_KEYWORD}\n\n{text}"
+            messages.append(text)
+        else:
+            messages.append(f"{DINGTALK_KEYWORD} （续 {index}/{len(parts)}）\n\n{part}")
     return messages
 
 
@@ -926,132 +1374,74 @@ def plan_messages(
 # ---------------------------------------------------------------------------
 
 def send_dingtalk(webhook: str, title: str, text: str) -> None:
-    """发送一条 markdown 消息。HTTP 200 不代表成功，必须检查 errcode。"""
-    if DINGTALK_KEYWORD not in text:
-        raise ValueError(f"消息正文缺少钉钉关键词 {DINGTALK_KEYWORD}，会被钉钉以 310000 拒收")
-
-    # msgUuid 是钉钉的幂等 key：超时重试时复用同一个值，避免群里收到两条重复消息。
     payload = {
         "msgtype": "markdown",
         "markdown": {"title": title, "text": text},
         "at": {"isAtAll": False},
-        "msgUuid": uuid.uuid4().hex,
     }
 
-    last_error = ""
-    for attempt in range(1, 4):
+    last_exc: Exception | None = None
+    for attempt in range(1, DINGTALK_RETRIES + 2):
         try:
-            response = requests.post(webhook, json=payload, timeout=15)
-        except requests.RequestException as exc:
-            last_error = f"网络异常：{exc}"
-            LOG.warning("%s（第 %d/3 次），5 秒后重试", last_error, attempt)
-            time.sleep(5)
-            continue
+            response = requests.post(webhook, json=payload, timeout=20)
+            # HTTP 200 不代表成功，必须看 errcode（值可能是字符串 "0"）。
+            data = response.json()
+            errcode = int(data.get("errcode", -1))
+            if errcode == 0:
+                return
 
-        try:
-            body = response.json()
-        except ValueError:
-            last_error = f"响应不是 JSON（HTTP {response.status_code}）：{response.text[:200]}"
-            LOG.warning(last_error)
-            time.sleep(5)
-            continue
+            errmsg = data.get("errmsg", "")
+            if errcode == 410100:
+                # 每机器人 20 条/分钟，超限直接封 10 分钟 —— 重试只会延长封禁。
+                sys.exit(
+                    f"❌ 钉钉限流（410100）：{errmsg}\n"
+                    f"   官方限制每机器人 20 条/分钟，超限封 10 分钟。等 10 分钟再跑。"
+                )
+            if errcode == 310000:
+                # 合并安全错误码：关键词不匹配 / timestamp 无效 / 签名不匹配 / IP 不在白名单
+                # 四种失败共用它，靠 errmsg 区分，所以必须打 errmsg 而不是只看 code。
+                sys.exit(
+                    f"❌ 钉钉安全校验未通过（310000）：{errmsg}\n"
+                    f"   检查机器人安全设置是否选了「自定义关键词」且关键词为「行业资讯」，"
+                    f"或是否误开了加签/IP 白名单。"
+                )
+            raise RuntimeError(f"钉钉返回 errcode={errcode} errmsg={errmsg}")
 
-        # errcode 可能是数字 0 也可能是字符串 "0"。
-        try:
-            errcode = int(body.get("errcode", -1))
-        except (TypeError, ValueError):
-            errcode = -1
-        errmsg = str(body.get("errmsg") or "")
+        except SystemExit:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            LOG.warning("钉钉推送失败（第 %d/%d 次）：%s",
+                        attempt, DINGTALK_RETRIES + 1, exc)
+            if attempt <= DINGTALK_RETRIES:
+                time.sleep(DINGTALK_BACKOFF * attempt)
 
-        if errcode == 0:
-            return
-
-        last_error = f"errcode={errcode} errmsg={errmsg}"
-        # 错误码说明见 README 的 FAQ。
-        if errcode == 310000:
-            # 关键词不匹配 / timestamp 无效 / 签名不匹配 / IP 不在白名单 —— 四种失败共用这个码，
-            # 必须读 errmsg 才知道是哪种。
-            raise RuntimeError(
-                f"钉钉安全校验未通过（errcode=310000, errmsg={errmsg}）。\n"
-                f"  常见原因：机器人安全设置选了「加签」或「IP 白名单」，但本脚本用的是「自定义关键词」。\n"
-                f"  请把机器人的自定义关键词设为：{DINGTALK_KEYWORD}"
-            )
-        if errcode == 410100:
-            raise RuntimeError(
-                f"钉钉限流（errcode=410100）。官方限制是每机器人 20 条/分钟，超限会被封 10 分钟。\n"
-                f"  本期周报拆分成了多条发送，请稍后重试。"
-            )
-
-        LOG.warning("发送失败：%s（第 %d/3 次），5 秒后重试", last_error, attempt)
-        time.sleep(5)
-
-    raise RuntimeError(f"钉钉推送连续 3 次失败：{last_error}")
+    raise RuntimeError(f"钉钉推送持续失败：{type(last_exc).__name__}: {last_exc}")
 
 
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
 
-def notify_no_news(cfg: dict[str, str], dry_run: bool, today: str, reason: str) -> int:
-    """本周无可推送内容时发一条简短提示。
-
-    这是刻意设计的：宁可每周都收到一条"无事发生"，也不要静默跳过 ——
-    否则你无法区分「这周确实没新闻」和「任务悄悄挂了」。
-    """
-    message = "\n".join([
-        f"# {DINGTALK_KEYWORD} 储能结构周报（{today}）",
-        "",
-        reason,
-        "",
-        "—— 本消息由自动化脚本生成，检索源：Tavily",
-    ])
-    if dry_run:
-        print("\n" + "=" * 60)
-        print(message)
-        print("=" * 60 + "\n")
-        LOG.info("dry-run 模式，未推送钉钉")
-        return 0
-
-    send_dingtalk(cfg["DINGTALK_WEBHOOK"], f"{DINGTALK_KEYWORD} 储能结构周报（{today}）", message)
-    LOG.info("已推送「无新增资讯」提示")
-    return 0
-
-
-def report_product_line_updates(updates: list[str]) -> None:
-    """把"清单外的华宝产品线"报给维护者。
-
-    这条刻意不进周报正文 —— 它是维护事项，不是给群里的行业情报。
-    输出到两处：日志（本地跑、Actions 日志都看得到），
-    以及 GitHub Actions 的 Step Summary（不翻日志也能在运行页面顶部看到）。
-    """
-    if not updates:
-        return
-
-    LOG.warning(
-        "发现 JACKERY_PRODUCTS 清单外的华宝产品线：%s —— 请更新 main.py 顶部的 JACKERY_PRODUCTS",
-        "、".join(updates),
-    )
-
-    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-    if not summary_path:
-        return
-    try:
-        with open(summary_path, "a", encoding="utf-8") as fh:
-            fh.write("## ⚠️ JACKERY_PRODUCTS 需要更新\n\n")
-            fh.write("本期资讯里出现了清单外的华宝产品线，模型没法对它们做对标：\n\n")
-            for name in updates:
-                fh.write(f"- {name}\n")
-            fh.write("\n请把它们补进 `main.py` 顶部的 `JACKERY_PRODUCTS`。\n")
-    except OSError as exc:
-        # 写不进 Step Summary 不影响主流程 —— 日志里已经记了一份。
-        LOG.warning("写入 GITHUB_STEP_SUMMARY 失败：%s", exc)
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="华宝新能储能结构周报推送")
-    parser.add_argument("--dry-run", action="store_true", help="只打印 Markdown，不推送钉钉、不写 history")
-    parser.add_argument("--limit", type=int, default=0, help="只跑前 N 条查询，用于快速验证")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="只打印 Markdown，不推送钉钉")
+    parser.add_argument("--out", default="", metavar="PATH",
+                        help="把生成的 Markdown 另存为文件，便于推送前审阅")
     args = parser.parse_args()
+
+    # Windows 上输出被重定向（管道 / VSCode 集成终端 / Git Bash）时，Python 会按
+    # 本地 locale（cp936）编码 —— 终端按 UTF-8 解，中文全是乱码；遇到 GBK 覆盖不到的
+    # 字符（㎡、≥、生僻字）还会直接抛 UnicodeEncodeError，让 --dry-run 崩在半路。
+    # 而 --dry-run 正是推送前审阅报告的必经步骤，不能在这儿翻车。
+    # errors="replace" 是兜底：宁可个别字显示成 ?，也不要整个流程挂掉。
+    # 真正的 Windows 控制台本来就已是 utf-8（PEP 528），这一步对它是空操作。
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass  # 被替换成不支持 reconfigure 的对象时静默跳过
 
     logging.basicConfig(
         level=logging.INFO,
@@ -1061,84 +1451,63 @@ def main() -> int:
     )
 
     cfg = load_config(dry_run=args.dry_run)
+    today = datetime.now(BEIJING_TZ)
 
-    today = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d")
-    queries = QUERIES[: args.limit] if args.limit and args.limit > 0 else QUERIES
+    # ⚠️ 传 today.date()（naive date）而不是 today —— 台账里存的是 YYYY-MM-DD，
+    # 带时区的 datetime 和 naive date 相减会抛 TypeError，第一天就崩。
+    history = load_history(HISTORY_PATH, today.date())
 
-    history = load_history()
-    LOG.info("台账中已有 %d 条历史链接", len(history))
+    LOG.info("调用 OpenRouter（%s）检索并撰写中……共 3 次：板块一两轮 + 其余板块一轮",
+             cfg["OPENROUTER_MODEL"])
+    report, citations = build_report(cfg, today, history)
+    LOG.info("报告生成完毕：%d 字，%d 个引用链接，%d 字节",
+             len(report), len(citations), len(report.encode("utf-8")))
 
-    candidates = search_all(cfg["TAVILY_API_KEY"], queries)
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as fh:
+            fh.write(report)
+        LOG.info("已另存到 %s", args.out)
 
-    # 剔除历史已推送过的，以及本轮内部重复的。
-    fresh = [c for c in candidates if c.normalized_url not in history]
-    LOG.info("剔除历史重复后剩余 %d 条新资讯", len(fresh))
-
-    if not fresh:
-        LOG.info("本周没有新增资讯")
-        # 没有新内容就不动台账。
-        return notify_no_news(cfg, args.dry_run, today, "本周期未检索到新的行业资讯，无新增内容。")
-
-    # 控制送入模型的候选条数。
-    if len(fresh) > MAX_INPUT_ITEMS:
-        LOG.info("候选 %d 条，截取前 %d 条送入模型", len(fresh), MAX_INPUT_ITEMS)
-        fresh = fresh[:MAX_INPUT_ITEMS]
-
-    LOG.info("调用大模型（%s）提炼中……", cfg["OPENAI_MODEL"])
-    digest = validate_digest(call_llm(cfg, fresh), fresh)
-
-    LOG.info(
-        "模型归类完成：竞品/结构共 %d 条，法规综述 %d 字",
-        digest.total_items, len(digest.regulation_summary),
-    )
-    report_product_line_updates(digest.product_line_updates)
-
-    # 模型把候选全部判为无关 —— 这是合法结果（检索命中一堆无关内容时就会这样），
-    # 不是故障。推一条提示让群里知道任务跑过了，而不是静默失败。
-    if digest.is_empty():
-        LOG.info("模型判定所有候选均与储能结构无关")
-        return notify_no_news(cfg, args.dry_run, today, "本周期检索到的内容与储能结构无关，未收录任何资讯。")
-
-    title = f"{DINGTALK_KEYWORD} 储能结构周报（{today}）"
-    header = render_header(
-        today, days=7, total=digest.total_items, highlights=digest.consistent_highlights(),
-    )
-    tail = (
-        render_regulation(len(digest.sections) + 1, digest.regulation_summary, digest.regulation_sources),
-        {url for _, url in digest.regulation_sources},
-    )
-    footer = "\n—— 本消息由自动化脚本生成，检索源：Tavily\n"
-    messages = plan_messages(header, digest.sections, tail, footer)
+    messages = plan_messages(report)
+    LOG.info("拆分为 %d 条消息，正文长度 %s 字节",
+             len(messages), [len(m.encode("utf-8")) for m in messages])
 
     if args.dry_run:
-        for index, (text, _) in enumerate(messages, start=1):
+        for index, text in enumerate(messages, start=1):
             print("\n" + "=" * 60 + f" 消息 {index}/{len(messages)} " + "=" * 60)
             print(text)
         print("=" * 60 + "\n")
-        LOG.info("dry-run 模式，未推送钉钉、未写台账")
+        # dry-run 只读不写台账 —— 否则"跑一次看看"会把没推出去的内容标成已推送，
+        # 下周被静默压制。
+        LOG.info("dry-run 模式，未推送钉钉，也未写入台账")
         return 0
 
-    pushed_urls: set[str] = set()
-    for index, (text, urls) in enumerate(messages, start=1):
+    title = f"{DINGTALK_KEYWORD} 储能结构周报（{today.strftime('%Y-%m-%d')}）"
+    for index, text in enumerate(messages, start=1):
         send_dingtalk(cfg["DINGTALK_WEBHOOK"], title, text)
-        pushed_urls |= urls
         LOG.info("已推送第 %d/%d 条消息", index, len(messages))
         if index < len(messages):
-            # 远低于 20 条/分钟的红线，但留个间隔更稳。
-            time.sleep(3)
+            time.sleep(MESSAGE_INTERVAL)
 
-    # 只记录真正推送出去的 URL —— 被模型丢弃或超出上限的链接下周还能重新出现。
-    for url in pushed_urls:
-        history[normalize_url(url)] = today
-    save_history(history)
+    LOG.info("推送完成")
 
-    LOG.info("完成：推送 %d 条资讯", len(pushed_urls))
+    # ⚠️ 台账**只在全部消息推送成功之后**才写。
+    # 中途失败走的是 sys.exit（310000/410100 那两条路径），SystemExit 不是 Exception，
+    # 会直接穿过这里 —— 于是台账不写、下次重跑会重发一遍。这是**刻意的**：
+    # 重复一期总好过把没送达读者的条目标成"已推送"，那会让它永远回不来。
+    entries = extract_entries(report)
+    for entry in entries:
+        entry["pushed"] = today.date().isoformat()
+    save_history(HISTORY_PATH, history + entries)
+    LOG.info("台账已更新：新增 %d 条，累计 %d 条 → %s",
+             len(entries), len(history) + len(entries), HISTORY_PATH.name)
     return 0
 
 
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception:  # noqa: BLE001 - 顶层兜底，确保非 0 退出让 Actions 变红
-        LOG.exception("执行失败")
-        sys.exit(1)
+    except Exception as exc:  # noqa: BLE001
+        # fail-loudly：宁可群里收不到消息、你去查日志，也不要静默失败几周后才发现。
+        LOG.error("执行失败：%s", exc)
+        raise

@@ -1,6 +1,7 @@
 # 统一行尾为 LF。
-# 本项目在 Windows 上开发，但 history_urls.json 由 Linux 上的 GitHub Actions 写回仓库。
+# 本项目在 Windows 上开发，但 pushed_history.json 由 Linux 上的 GitHub Actions 写回仓库。
 # 如果本地检出成 CRLF、CI 写成 LF，每次自动 commit 都会产生整文件级别的假 diff。
+# （main.py 的 save_history 也主动用 newline="\n" 写，两边一起保证。）
 * text=auto eol=lf
 
 # Key 文件永不被 git 处理（它本来就不该入仓，双保险）。
