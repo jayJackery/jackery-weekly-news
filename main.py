@@ -407,10 +407,10 @@ ROLE_AND_RULES = f"""你是储能行业的资深硬件分析师，长期服务�
   **绝对不要编造产品、日期、数字或链接**。
 - 关键数据必须精准：重量、尺寸、体积/重量变化百分比、容量、功率、IP 防护等级、
   能量密度、压实密度、循环寿命、价格。拿不准的数字宁可不写，也不要写个大概。
-- ⚠️ **中英双语并行检索 —— 这一条最关键，直接决定板块一有没有内容。**
-  便携储能与阳台储能的新品首发**绝大多数只出现在英文行业媒体**，中文媒体通常不转载。
-  只搜中文会系统性漏掉整个板块一。必须同时用英文关键词检索，英文源清单与关键词
-  见 user 提示。
+- ⚠️ **中英双语并行检索 —— 漏掉哪个方向都会漏内容。** 便携储能与阳台储能的多数
+  新品首发在英文行业媒体，中文媒体通常不转载；但**中国厂商的国内首发只在中文源里**
+  （大疆的电源产品线在英文媒体上覆盖尤其薄），型号、参数与价格以人民币和中文报道为准。
+  **两个方向都要检索**，源清单与中英文关键词示例见 user 提示。
 - 每条资讯都要带**原始网页链接**，写成 `[来源简称](完整URL)` 的形式，紧跟在句末。
   ⚠️ 链接**必须是文章详情页**。栏目页、分类页、标签页、聚合页一律不要 ——
   路径形如 `/category/...`、`/tag/...`、`/subjects/...`、`/industry-updates/`、
@@ -477,8 +477,10 @@ SECTION1_VENDORS = """\
    EcoFlow（正浩）、Anker SOLIX、BLUETTI（德兰明海）、DJI Power（大疆）、
    Goal Zero、Segway、Oupes、Vtoman、Eco-Worthy 等的新品与形态变化。
    **检索时用英文名**：EcoFlow / Anker SOLIX / BLUETTI / DJI Power /
-   Goal Zero / Segway / Oupes / Vtoman；阳台储能另有 Hoymiles、Zendure、
-   Anker SOLIX Solarbank、PowerOak。
+   Goal Zero / Segway / Oupes / Vtoman / Eco-Worthy；阳台储能另有 Hoymiles、
+   Zendure、Anker SOLIX Solarbank、PowerOak。
+   ⚠️ **上面这份英文名单要与上面的中文名单一一对应。** Eco-Worthy 曾整个漏在英文
+   名单外 —— 它没有中文名，漏掉就等于这家厂商没有任何检索入口，会静默消失。
    ⚠️ **Jackery（华宝新能）自己的产品刻意不在上面这份清单里，也不要补进来。**
    板块一是给读者看**别人在做什么**；自家产品只在板块五出现。
    每条重点写：新品形态、体积/重量相对前代的变化%、防护等级、盲插/堆叠/无线连接架构、价格。
@@ -575,21 +577,47 @@ def _window(today: datetime) -> tuple[str, str]:
 
 
 def _retrieval_hint() -> str:
-    """检索型调用的 user 提示里都要附的英文源清单与关键词。"""
+    """检索型调用的 user 提示里都要附的源清单与关键词。
+
+    ⚠️ 这段被**三处**调用共用（板块一两轮 + 板块二~五），所以措辞必须**板块中性**。
+    早先的版本写死了板块一口径（"这一条决定板块一有没有内容""便携与阳台储能的新品
+    首发"），板块二~五拿到手等于没有源指引 —— 户用/工商业/材料那几个板块的中国厂商
+    动态同样会被漏。
+
+    ⚠️ **中英两边的源和关键词都要给，而且两个方向的警告都要写。** 只写"只搜中文会
+    漏掉整个板块"会让模型倒向英文，进而漏掉中国厂商的国内首发 —— 大疆就是这么丢的：
+    DJI Power Auro 2000 Elite（2 度电户外电源，4,799 元）2026-09-21 在中国发布，
+    日期就在 r9.md 的窗口内，整条没出现。而英文源清单里跟大疆相关的只有
+    DroneDJ / DroneXL 两家**无人机**媒体，对电源产品线的覆盖本就很薄。
+    """
     return (
-        "【检索语言 —— 这一条决定板块一有没有内容】\n"
-        "便携储能与阳台储能的新品首发，绝大多数**只出现在英文行业媒体**，"
-        "中文媒体通常不转载。**只搜中文会系统性漏掉整个板块。**\n"
-        "请中英双语并行检索，并覆盖下列英文源：\n"
-        "  · 厂商官方新闻稿：PR Newswire、Business Wire、EQS News、GlobeNewswire\n"
-        "  · 行业媒体：pv magazine、ESS News、Energy-Storage.News、Electrek、\n"
-        "    CleanTechnica、Solar Power World\n"
-        "  · 消费电子与评测：Gizmodo、The Verge、Notebookcheck、9to5Toys、\n"
-        "    DroneDJ / DroneXL、Impress Watch、PC Watch\n"
-        "  · 展会官方发布：Solar & Storage Live、IFA、Intersolar、RE+、SNEC\n"
+        "【检索语言 —— 必须中英双语并行，漏哪个方向都会漏内容】\n"
+        "只搜中文会漏掉海外首发：便携储能与阳台储能的多数新品首发在英文行业媒体，\n"
+        "中文媒体通常不转载。\n"
+        "⚠️ **只搜英文同样会漏，而且漏掉的是中国厂商的国内首发。** 大疆（DJI Power）、\n"
+        "正浩（EcoFlow）、德兰明海（BLUETTI）、安克、海辰储能、派能、亿纬、阳光电源\n"
+        "等常在中国先发，型号、参数与价格以人民币和中文报道为准。\n"
+        "**大疆尤其要注意**：它的英文报道集中在无人机线，电源产品线（DJI Power）\n"
+        "在英文媒体上覆盖很薄 —— 只搜英文基本看不到它的电源新品。\n"
+        "请中英双语并行检索，两边都要覆盖：\n"
+        "  英文源：\n"
+        "    · 厂商官方新闻稿：PR Newswire、Business Wire、EQS News、GlobeNewswire\n"
+        "    · 行业媒体：pv magazine、ESS News、Energy-Storage.News、Electrek、\n"
+        "      CleanTechnica、Solar Power World\n"
+        "    · 消费电子与评测：Gizmodo、The Verge、Notebookcheck、9to5Toys、\n"
+        "      DroneDJ / DroneXL、Impress Watch、PC Watch\n"
+        "    · 展会官方发布：Solar & Storage Live、IFA、Intersolar、RE+、SNEC\n"
+        "  中文源：\n"
+        "    · 厂商官网与官方账号：DJI 大疆中国官网新闻中心、正浩、德兰明海、安克、\n"
+        "      华为数字能源、阳光电源、海辰储能、派能\n"
+        "    · 行业与科技媒体：IT之家、快科技、充电头网、爱范儿、中关村在线、\n"
+        "      新浪科技、第一财经、财联社、EnergyTrend、储能与电力市场\n"
         "英文关键词示例：portable power station launch、home battery module、\n"
         "balcony solar storage、all-in-one ESS、sodium-ion BESS、new LFP cell、\n"
-        "drop test / IP rating / thermal runaway enclosure、swappable battery module。"
+        "drop test / IP rating / thermal runaway enclosure、swappable battery module。\n"
+        "中文关键词示例：户外电源 新品发布、便携电源 上市、阳台储能 一体机、\n"
+        "大疆 电源 发布、正浩 新品、德兰明海 新品、构网型储能 发布、钠离子电芯 量产、\n"
+        "储能柜 液冷 发布、电芯 能量密度 量产。"
     )
 
 
