@@ -504,14 +504,33 @@ MAIN_SYSTEM_PROMPT = f"""{ROLE_AND_RULES}
    同样用 `### 厂商 —— 一句话标题` 作为小标题。
 
 ## 三、电池与材料技术突破
-   新电芯化学（高压实 LFP、钠离子、固态）、阻燃与隔热新材料（气凝胶、阻燃工程塑料）、
-   轻量化材料、以及**膨胀力对 Pack 结构的影响**这类与结构强相关的隐患。
-   每条重点写：材料/电芯体系的量化指标，以及它对 Pack 结构设计意味着什么。
+   两类内容都要覆盖：
+   ① **电芯与体系侧**：新电芯化学（高压实 LFP、钠离子、固态）、阻燃与隔热材料
+      （气凝胶、阻燃工程塑料）、轻量化材料、以及**膨胀力对 Pack 结构的影响**
+      这类与结构强相关的隐患。
+   ② **结构件材料侧**：户用与移动储能结构件**本身常用**的材料与工艺进展 ——
+      **钣金**（冲压/折弯/激光焊/铆接、板厚减薄、镀锌与粉末喷涂等表面处理、
+      结构胶粘接）、**塑胶**（注塑件、阻燃 PC/ABS、玻纤增强尼龙、结构发泡、
+      免喷涂工艺）、压铸铝、挤出型材、导热与密封胶。写**牌号 / 性能指标 /
+      工艺窗口**的变化：屈服强度、UL94 阻燃等级、耐候等级、可回收性、
+      公差与装配工序。
+   每条重点写：量化的材料指标，以及它对 Pack / 结构件设计意味着什么。
+   拿不到具体牌号、指标或工艺参数的，不要占条目 ——"某公司推出新材料"没有落点。
 
 ## 四、安规与政策大事件
-   UL 2743、欧洲阳台光伏与户储规范（如德国 DIN VDE V 0126-95、UL 3700）、
-   各国认证与关税、供应链与产能政策。这一节写成**若干条短段落**，
-   不需要厂商小标题，但同样要给链接。
+   按**主要购买地区**分组，固定用下面三个加粗分组行（文字照抄，各占一行），
+   每组写一到两段：**北美**、**欧洲**、**日本**。
+   每组都要覆盖该地区的三类事件：
+   ① 产品安规与认证：UL 2743、UL 3700、NFPA 855、德国 DIN VDE V 0126-95 等；
+   ② 认证与关税、供应链与产能政策；
+   ③ **安装与维护要求**：安装人员资质与持证电工、并网报备与验收、检修通道与
+      净空、离墙距离、年度维护与检查记录、消防验收、退役拆解与回收责任。
+   ⚠️ 某个地区本周期确实没有新动态时，**直接省略该地区那一行**。省略是正常的、
+   不会让报告显得不完整 —— 读者要的是有内容的地区，一句"本周期未检索到…"只是噪音。
+   报告短一点没关系，但**不要**用占位句、窗口外的旧闻、或与这三类无关的内容
+   （项目融资、企业动态、中标新闻）去把三组凑满。
+   ⚠️ **这一节不要用 `### ` 小标题。** 地区名必须写成 `**北美**` 这种独立加粗行，
+   下面直接跟短段落，同样要给链接。
 
 ## 五、对华宝新能（Jackery）结构与产品定义的启发
    从**硬件视角**总结 3 点建议，每点 2~3 句，落点在 Pack 集成度、散热风道设计、
@@ -614,10 +633,18 @@ def _retrieval_hint() -> str:
         "      新浪科技、第一财经、财联社、EnergyTrend、储能与电力市场\n"
         "英文关键词示例：portable power station launch、home battery module、\n"
         "balcony solar storage、all-in-one ESS、sodium-ion BESS、new LFP cell、\n"
-        "drop test / IP rating / thermal runaway enclosure、swappable battery module。\n"
+        "drop test / IP rating / thermal runaway enclosure、swappable battery module、\n"
+        "sheet metal enclosure stamping、die-cast aluminum housing、injection-molded\n"
+        "flame-retardant PC/ABS、UL94 V-0 enclosure、structural adhesive、gasket\n"
+        "sealing、powder coating corrosion resistance、glass-filled nylon bracket；\n"
+        "installation code for home battery、clearance and service access、certified\n"
+        "installer requirement、annual inspection record、battery removal and recycling。\n"
         "中文关键词示例：户外电源 新品发布、便携电源 上市、阳台储能 一体机、\n"
         "大疆 电源 发布、正浩 新品、德兰明海 新品、构网型储能 发布、钠离子电芯 量产、\n"
-        "储能柜 液冷 发布、电芯 能量密度 量产。"
+        "储能柜 液冷 发布、电芯 能量密度 量产、钣金 机箱 冲压 工艺、压铸铝 壳体、\n"
+        "注塑 阻燃 PC/ABS、结构胶 密封 储能、粉末喷涂 耐候、玻纤增强 支架；\n"
+        "储能 安装规范 检修通道、并网验收 要求、持证电工、维护记录 要求、\n"
+        "电池 拆解 回收 责任。"
     )
 
 
@@ -1078,8 +1105,13 @@ def drop_repeat_blocks(
     这里的标题不能混进 `banned_urls` —— 那一批是"折扣稿黑名单"，混进去等于告诉模型
     这些是真新闻的反面，会让它连带躲开整个域名。
 
-    只删 `### ` 块。板块四（短段落）与板块五（bullet）没有 `### ` 块，代码够不着，
-    它们靠提示词，这里只对够得着的部分之外的段落打个 WARNING 交人工看一眼。
+    只删 `### ` 块。板块四（分地区短段落）与板块五（bullet）没有 `### ` 块，代码够不着，
+    纯靠提示词兜。
+
+    ⚠️ **这两个板块连告警都没有 —— 别以为这里还有第二道网。** 按 `group_blocks` /
+    `_section_of_blocks` 的语义，板块四、五的正文归属于各自 `## ` 标题所在的 **h2 块**
+    （首行是 `## `），既不是 `h3` 也不是 `other`，所以下面两处分支都够不到它们：
+    命中重复时既不删、也不打 WARNING。要让板块四真正被检查，得改成按段落扫描。
     """
     if not seen:
         return text, []
@@ -1123,9 +1155,9 @@ def drop_repeat_blocks(
                         where, reasons[index], title)
             dropped.append(title)
             continue
-        # 代码够不着的位置（板块四的短段落等）只告警，不删 —— 段落里往往混着同段
-        # 的真情报，删了会连带丢掉。板块五跳过：它引用板块一的链接是设计要求，
-        # 每周都会命中，告警只会变成噪音。
+        # 只覆盖第一个 `## ` 之前的前导块。**板块四、五的段落走不到这里** —— 它们
+        # 归属各自 `## ` 标题所在的 h2 块，不是 `other`（见 _section_of_blocks）。
+        # 前导块命中时只告警不删：段落里往往混着同段的真情报，删了会连带丢掉。
         if kind == "other" and section != SECTION_FIVE_HEADING:
             if block_repeat_reason(chunk, seen):
                 LOG.warning("[%s] 段落命中已推送过的链接，但段落无法整块删除，"
