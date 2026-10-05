@@ -1,4 +1,146 @@
 {
   "version": 1,
-  "entries": []
+  "entries": [
+    {
+      "title": "DJI Power —— Power Auro 2000 Elite 将 2 度电压缩进更小机身",
+      "urls": [
+        "https://www.ithome.com/1/005/427.htm",
+        "https://www.itsdw.cn/news/26430.html"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "DJI Power —— Power 2000 以套装形态进入阳台光储",
+      "urls": [
+        "https://dronexl.co/2026/09/04/dji-power-2000-balcony-solar-ifa-2026-not-in-us/",
+        "https://www.dji.com/media-center/announcements/ifa-2026-dji-berlin-osmo-360-2-romo-2-power-system"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "EcoFlow —— PowerRock 4000 采用 IP65 金属壳体和防滚笼",
+      "urls": [
+        "https://www.ecoflow.com/eu/enterprise/powerrock",
+        "https://www.prnewswire.com/news-releases/breaking-boundaries-ecoflow-unveils-river-gen4-and-powerrock-4000-at-ifa-2026-302869915.html"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "EcoFlow —— RIVER Gen4 以小型化和 UPS 架构覆盖低功率备电",
+      "urls": [
+        "https://www.ecoflow.com/de/ifa-2026",
+        "https://www.theverge.com/science/991033/ecoflow-makes-the-miniature-power-station-even-smaller"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "BLUETTI —— Pioneer 5000 用带轮防护框架替代燃油发电机形态",
+      "urls": [
+        "https://www.bluetti.com/events/IFA",
+        "https://www.ess-news.com/2026/09/11/ifa-2026-bluettis-new-products-unveiled-new-pioneer-5000-is-ready-for-job-sites/",
+        "https://www.prnewswire.com/news-releases/bluetti-unveils-pioneer-5000-e-generator-at-ifa-2026-302853582.html"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "BLUETTI —— Balco 500 将现有电源站接入阳台并网场景",
+      "urls": [
+        "https://www.prnewswire.com/news-releases/bluetti-expands-smarter-energy-solutions-from-balcony-to-everywhere-at-ifa-2026-302861663.html",
+        "https://www.techlicious.com/blog/bluetti-showcases-battery-generator-balcony-solar-system-at-IFA-2026/"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Anker SOLIX —— Solarbank Max 把阳台电池扩展到 7kWh 住宅级模块",
+      "urls": [
+        "https://www.anker-in.com/posts/ifa2026",
+        "https://www.heise.de/news/Anker-Solix-Solarbank-Max-mit-Solarleistung-bis-10-kWp-11439221.html",
+        "https://www.techradar.com/home/energy-saving/plug-in-solar-shone-at-ifa-2026-here-are-the-5-best-products-we-saw-from-anker-to-dji-and-ecoflow"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Zendure —— SolarFlow Mix、PowerHub 与 Agentic HEMS 组成多设备家庭能源架构",
+      "urls": [
+        "https://us.best-batteries.com/product-launches/"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Hoymiles —— 本周期未检索到窗口内可核实的新品详情页",
+      "urls": [],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Goal Zero —— 本周期未检索到窗口内可核实的新品详情页",
+      "urls": [],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Segway —— 本周期未检索到窗口内可核实的新品详情页",
+      "urls": [],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Oupes —— 本周期未检索到窗口内可核实的新品详情页",
+      "urls": [],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Vtoman —— 本周期未检索到窗口内可核实的新品详情页",
+      "urls": [],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Eco-Worthy —— 本周期未检索到窗口内可核实的新品详情页",
+      "urls": [],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Sungrow —— PowerHarbor 一体化户用储能系统在比荷卢地区上市",
+      "urls": [],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Huawei —— Chile 48MW/275.23MWh BESS 完成构网型现场测试",
+      "urls": [
+        "https://www.pv-magazine.com/2026/09/22/chile-tests-grid-forming-tech-at-48-mw-275-mwh-bess/"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "BYD Energy Storage —— 发布最高 62MWh 的 GC Block 标准化储能单元",
+      "urls": [],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "CATL —— 匈牙利 Debrecen 电芯工厂启动试生产",
+      "urls": [
+        "https://www.prnewswire.com/il/news-releases/catl-kicks-off-trial-production-of-battery-cells-in-hungary-302886109.html"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "Pylontech —— 588Ah/601Ah 储能电芯进入规模化量产",
+      "urls": [
+        "https://finance.sina.com.cn/roll/2026-09-22/doc-inissyrc5681585.shtml",
+        "https://www.prnewswire.com/apac/zh/news-releases/588ah601ah-302884898.html"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "CATL —— 匈牙利试生产将电芯制造环节前移至欧洲",
+      "urls": [
+        "https://www.prnewswire.com/il/news-releases/catl-kicks-off-trial-production-of-battery-cells-in-hungary-302886109.html"
+      ],
+      "pushed": "2026-10-05"
+    },
+    {
+      "title": "LG Energy Solution —— 2.5MW/5.1MWh 模块化 BESS 通过安全认证",
+      "urls": [
+        "https://finance.yahoo.com/energy/articles/lg-energy-solutions-battery-energy-180000357.html"
+      ],
+      "pushed": "2026-10-05"
+    }
+  ]
 }
