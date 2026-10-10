@@ -5,7 +5,13 @@
 流程：OpenRouter（perplexity/sonar-pro-search）联网检索并撰写 → 本地校验与分段 → 推送钉钉群。
 
 OpenRouter 上的 sonar 系列本身就会联网检索，检索与撰写在一次调用里完成，
-所以本地不再做搜索、去重台账或大模型二次提炼 —— 那些逻辑随旧方案一并移除。
+所以本地不做搜索、也不做"让模型返回 JSON 再本地渲染"那一套 —— 那是旧版
+（Tavily + DeepSeek 方案）的产物，已随重构移除，不要重新引入。
+
+⚠️ **唯一的例外是跨周去重台账 `pushed_history.json`**（见下面的「跨周台账」一节）——
+它是 2026-09 为配合检索窗口放宽到 14 天而加回来的，不是旧方案的残留。
+**不要因为"旧版有个同名的 history_urls.json"就把它删掉**（何况那个文件自始至终是空的，
+从来没生效过 —— 见该节注释）。
 
 用法：
     python main.py                # 完整流程
@@ -18,6 +24,7 @@ OpenRouter 上的 sonar 系列本身就会联网检索，检索与撰写在一�
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import logging
 import os
@@ -127,6 +134,33 @@ MAX_MESSAGE_BYTES = 8000
 MESSAGE_INTERVAL = 3            # 秒
 DINGTALK_RETRIES = 2
 DINGTALK_BACKOFF = 5            # 秒
+
+# ---------------------------------------------------------------------------
+# 网页站点（GitHub Pages）
+# ---------------------------------------------------------------------------
+# 每期报告同时落一份到 docs/，随台账一起由 workflow 提交回仓库，
+# GitHub Pages 从 `main` 分支的 /docs 目录发布。钉钉群里只发"摘要 + 链接"，
+# 全文在网页上 —— 群消息会被后续聊天顶掉，网页不会。
+#
+# ⚠️ **目录必须叫 docs/，不能改成 reports/ 之类。**
+# GitHub Pages 的 "Deploy from a branch" 只给 `/ (root)` 与 `/docs` 两个源选项。
+# 叫别的名字就只能选根目录，那会把**整个仓库**当网站发布 —— main.py、CLAUDE.md、
+# pushed_history.json 全部可被直接下载。
+#
+# ⚠️ **docs/ 里的内容绝不能出现生成时间戳、版本号、datetime.now()。**
+# 整个站点是**幂等重建**的：同样的 .md 输入必须产出逐字节相同的 .html。
+# 一旦有字段每次都变，工作区就永远是脏的，workflow 最后的 `git rebase` 会报
+# "cannot rebase: You have unstaged changes"，重试 3 次全失败，job 周周变红。
+DOCS_DIR = Path(__file__).resolve().parent / "docs"
+
+# GitHub Pages 站点根，末尾不带斜杠。可通过环境变量 SITE_BASE_URL 覆盖。
+# **设成空串就关闭整个网页功能**，退回"推送全文"的旧行为
+# （plan_messages 的分段路径还在，就是给这个兜底留的）。
+DEFAULT_SITE_BASE_URL = "https://jayJackery.github.io/jackery-weekly-news"
+
+# 归档首页与当期页面的文件名形状。写成常量是为了和 workflow 里的白名单正则保持一致 ——
+# 两处一旦漂移，CI 会因为"暂存区出现白名单外的路径"而硬失败。
+SITE_INDEX_NAME = "index.html"
 
 # ---------------------------------------------------------------------------
 # 促销稿过滤
@@ -363,13 +397,33 @@ def history_note(entries: list[dict]) -> str:
     )
 
 
+def strip_entry_title(entry_line: str) -> str:
+    """剥掉 `### ` 前缀与条目序号，返回标题。**保留粗体标记。**
+
+    `### 1. **BLUETTI** —— Balco 500` → `**BLUETTI** —— Balco 500`
+
+    两处共用这个函数：`extract_entries()` 写台账、`build_digest()` 写群消息摘要。
+    不要写两遍 —— 剥得不一致会让台账里的标题和摘要里的对不上。
+
+    ⚠️ 序号必须剥掉。台账标题会被渲染进下周的「上期标题清单」，带着 `1.` 会让模型
+    把它误读成一条**关于顺序的指令**，而不是一条内容。四种写法都兜住：
+    `1.` / `1、` / `1)` / `1）`。
+
+    ⚠️ 已知的隐含假设：正则要求序号在标题最前。**本项目的标题永远以厂商名开头**，
+    所以 `### 1.5 倍膨胀力的实测数据` 这种会被误剥成 `5 倍…` —— 目前不可能出现，
+    但这正是它没能覆盖的形状。
+    """
+    title = entry_line.lstrip("# ").strip()
+    return re.sub(r"^\d+\s*[.、)）]\s*", "", title).strip()
+
+
 def extract_entries(report: str) -> list[dict]:
     """从**最终推送出去的正文**里抽条目，供台账记录。
 
     ⚠️ 必须是最终正文（plan_messages 的输入），**不是模型的原始输出** ——
     从原始输出抽会把已经被促销过滤器删掉的条目标成"已推送"，那些内容就永远回不来了。
 
-    按 `### ` 分块；每块记标题（去掉 `###` 与粗体标记）与其中的文章页链接。
+    按 `### ` 分块；每块记标题（去掉 `###`、序号与粗体标记）与其中的文章页链接。
     **没有链接的块也照样记录标题** —— 否则下周它还会以同样的话术再来一遍。
     `## 参考来源` 兜底用的是 `<url>` 尖括号写法，MARKDOWN_LINK_RE 匹配不到，
     正好不会被误记。
@@ -379,13 +433,9 @@ def extract_entries(report: str) -> list[dict]:
         chunk = "\n".join(block)
         if not chunk.lstrip().startswith("### "):
             continue
-        # 厂商名在 `### ` 行里通常是加粗的（`### **BLUETTI** —— ...`），
+        # 台账是要塞进提示词的纯文本，所以比别人多剥一层粗体标记：
         # `strip("*")` 只去首尾，中间的 `**` 会留下来污染标题，所以整体删掉星号。
-        title = re.sub(r"\*+", "", block[0].lstrip("# ")).strip()
-        # ⚠️ 再剥掉条目序号（`### 1. `）。序号只是给读者看的行号，每周随排序变化，
-        # 而台账里的标题会被渲染进下周的「上期标题清单」—— 带着"1."会让模型
-        # 误读成一条关于顺序的指令。四种写法都兜住：`1.` / `1、` / `1)` / `1）`。
-        title = re.sub(r"^\d+\s*[.、)）]\s*", "", title).strip()
+        title = re.sub(r"\*+", "", strip_entry_title(block[0])).strip()
         if not title:
             continue
         urls = sorted({
@@ -830,10 +880,30 @@ def load_config(dry_run: bool) -> dict[str, str]:
     if missing:
         sys.exit("❌ 缺少必需的环境变量：\n\n" + "\n\n".join(f"  - {m}" for m in missing))
 
+    # 网页站点根。**可选**，不给就用默认值。
+    #
+    # ⚠️ 取到空串时**用默认值**，不能把空串当成"关闭"：workflow 里写的是
+    # `${{ vars.SITE_BASE_URL }}`，仓库变量没配时它会展开成空串 —— 若空串等于关闭，
+    # 网页功能就会在 CI 上**静默失效**，而所有结构校验一个都不会响。
+    # 真要关闭，把变量显式设成 off。
+    site_base_url = (
+        os.environ.get("SITE_BASE_URL") or DEFAULT_SITE_BASE_URL
+    ).strip().rstrip("/")
+    if site_base_url.lower() in {"off", "none", "false", "0"}:
+        site_base_url = ""
+    elif not site_base_url.startswith("http"):
+        sys.exit(
+            f"❌ SITE_BASE_URL 格式不对。\n"
+            f"   期望：https://<用户名>.github.io/<仓库名>\n"
+            f"   实际：{site_base_url[:60]}\n"
+            f"   （想关闭网页功能、退回推送全文，就把它设成 off）"
+        )
+
     return {
         "OPENROUTER_API_KEY": api_key,
         "DINGTALK_WEBHOOK": webhook,
         "OPENROUTER_MODEL": (os.environ.get("OPENROUTER_MODEL") or OPENROUTER_MODEL).strip(),
+        "SITE_BASE_URL": site_base_url,
     }
 
 
@@ -1369,6 +1439,1108 @@ def _assert_all_sections(report: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 网页站点（GitHub Pages）
+# ---------------------------------------------------------------------------
+# 群里只发"摘要 + 链接"，报告全文落在 docs/ 里，由 workflow 提交回仓库、Pages 发布。
+#
+# 为什么不引 markdown 库：本项目刻意只有 requests 一个依赖（见文件顶部）。报告由提示词
+# 固定成「四段式」，语法集合是一个**可枚举的封闭子集**，自己写 100 行足够，而且不会
+# 随第三方库升级而漂移。
+#
+# ⚠️ **页面里绝不能出现生成时间戳、版本号、datetime.now()。** 站点是幂等重建的：
+# 同样的 .md 输入必须产出逐字节相同的 .html。一旦有字段每次都变，工作区就永远是脏的，
+# workflow 最后的 `git rebase` 会报 "cannot rebase: You have unstaged changes"。
+
+_PAGE_CSS = """
+:root {
+  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
+  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
+  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  color-scheme: light;
+}
+/* 没有显式选择时跟随系统。`:root:not([data-theme])` 与下面的 `:root[data-theme=…]`
+   特异性相同（都是 0,2,0），所以**顺序决定胜负** —— 显式那两条必须在文档里靠后，
+   否则点了按钮不生效。 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
+    --bg:#0d1117; --code:#161b22; --accent:#f0883e;
+    --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
+  --bg:#0d1117; --code:#161b22; --accent:#f0883e;
+  --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
+  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
+  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 820px; margin: 0 auto; padding: 22px 20px 72px; }
+nav.top {
+  display: flex; gap: 12px; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 26px;
+  font-size: 14px;
+}
+nav.top .disabled { color: var(--muted); }
+h1 { font-size: 23px; line-height: 1.45; margin: 0 0 6px; }
+h2 {
+  font-size: 19px; margin: 38px 0 10px; padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+h3 { font-size: 16.5px; margin: 26px 0 4px; }
+p, li { word-break: break-word; }
+ul, ol { padding-left: 22px; }
+li { margin: 4px 0; }
+blockquote {
+  margin: 0 0 22px; padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--line); color: var(--muted);
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code, pre { background: var(--code); border-radius: 6px; }
+pre { padding: 12px; overflow-x: auto; font-size: 13px; }
+strong { font-weight: 600; }
+footer {
+  margin-top: 52px; padding-top: 16px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 13px;
+}
+.archive { list-style: none; padding: 0; margin: 8px 0 0; }
+.archive li {
+  display: flex; gap: 14px; align-items: baseline;
+  padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.archive .d { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.archive .sub { color: var(--muted); font-size: 13px; }
+.archive .none { color: var(--muted); }
+
+/* ---------------- 图文版 / 文字版 切换（纯 CSS，不用 JS） ----------------
+   兄弟选择器 `~` 要求 radio 必须排在 .view / .vswitch **前面**，且同为 .wrap 的子元素。
+   用 radio 而不是一段 JS：邮件客户端、RSS 阅读器、企业策略下 JS 可能被禁，
+   而这几类正是本报告的读者可能遇到的环境。代价是**选择不会跨页记住**。
+   ⚠️ 这段注释里不要写出尖括号标签名 —— `_PAGE_CSS` 是内联进 `<style>` 的，
+   一旦出现结束标签就会把整个样式块提前截断。见下方 `_theme_script_is_safe` 的守卫。 */
+.vmode { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.has-toggle .view { display: none; }
+.has-toggle #v-rich:checked ~ .view-rich { display: block; }
+.has-toggle #v-plain:checked ~ .view-plain { display: block; }
+/* ⚠️ 控件行必须是 radio 的**后置兄弟**，`~` 才够得到；标签再嵌一层 .vswitch 不影响，
+   但选择器要写成 `~ .ctrls label[…]`，不能写成 `~ .vswitch label[…]`。 */
+.ctrls {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 9px; margin: -10px 0 18px;
+}
+.vswitch { display: flex; }
+.vswitch label {
+  cursor: pointer; font-size: 13px; padding: 5px 14px; user-select: none;
+  border: 1px solid var(--line); color: var(--muted); background: var(--bg);
+}
+.vswitch label:first-of-type { border-radius: 999px 0 0 999px; }
+.vswitch label:last-of-type { border-radius: 0 999px 999px 0; border-left: 0; }
+.has-toggle #v-rich:checked ~ .ctrls label[for="v-rich"],
+.has-toggle #v-plain:checked ~ .ctrls label[for="v-plain"] {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+/* 无 JS 时按钮保持 hidden，不显示一个点了没反应的假按钮。 */
+.themebtn {
+  font: inherit; font-size: 13px; padding: 5px 14px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--bg); color: var(--muted); white-space: nowrap;
+}
+.themebtn:hover { color: var(--fg); border-color: var(--muted); }
+.themebtn[hidden] { display: none; }
+
+/* ---------------- 报告头 ---------------- */
+.hero {
+  background: var(--tint); border: 1px solid var(--line); border-radius: 14px;
+  padding: 22px 22px 18px; margin-bottom: 20px;
+}
+.hero .kicker {
+  font-size: 12.5px; font-weight: 600; letter-spacing: .1em;
+  color: var(--accent); margin-bottom: 6px;
+}
+.hero h1 { margin: 0 0 14px; line-height: 1.3; }
+.hero h1 .h1a { font-size: 19px; font-weight: 500; }
+.hero h1 .h1b {
+  font-size: 27px; font-weight: 700; margin-left: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.hero .meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.hero .lead { margin-top: 15px; padding-top: 14px; border-top: 1px solid var(--line); }
+.hero .lead p { margin: 0 0 8px; font-size: 15px; }
+.hero .lead p:last-child { margin-bottom: 0; }
+.chip {
+  font-size: 12.5px; padding: 3px 11px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--muted);
+}
+
+/* ---------------- 目录 ---------------- */
+.toc {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--tint);
+  padding: 15px 19px; margin-bottom: 24px;
+}
+.toc-t {
+  font-size: 12.5px; color: var(--muted); letter-spacing: .06em; margin-bottom: 9px;
+}
+.toc ul { list-style: none; padding: 0; margin: 0; }
+.toc li { margin: 7px 0; }
+.toc a { display: flex; gap: 10px; align-items: baseline; }
+.toc a:hover { text-decoration: none; }
+.toc a:hover .toc-t2 { text-decoration: underline; }
+.toc .tn {
+  flex: none; width: 20px; height: 20px; border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--accent);
+  font-size: 12px; font-weight: 600; line-height: 19px; text-align: center;
+}
+.toc .toc-t2 { font-size: 14.5px; color: var(--fg); }
+.toc .tc { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+/* ---------------- 板块卡片 ---------------- */
+section[id] { scroll-margin-top: 16px; }
+.card {
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 20px 14px; margin-bottom: 22px;
+}
+.sec-head { display: flex; align-items: center; gap: 11px; margin: 0 0 12px; }
+.sec-num {
+  flex: none; width: 30px; height: 30px; border-radius: 9px;
+  background: var(--accent); color: #fff; font-size: 15px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.sec-title { font-size: 18.5px; font-weight: 600; line-height: 1.4; }
+.sec-count { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+/* ---------------- 条目 ---------------- */
+.entry { padding: 15px 0 4px; border-top: 1px dashed var(--line); }
+.entry:first-of-type { border-top: 0; padding-top: 2px; }
+.entry-head { margin: 0 0 9px; font-size: 16.5px; line-height: 1.55; font-weight: 600; }
+.entry-head .idx {
+  display: inline-block; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 5px; background: var(--tint); border: 1px solid var(--line);
+  color: var(--muted); font-size: 11.5px; font-weight: 600;
+  line-height: 17px; text-align: center; vertical-align: 2px; margin-right: 7px;
+}
+.entry-head .vendor { color: var(--accent); }
+.entry-head .etitle { font-weight: 500; }
+.entry-head .dash { color: var(--muted); font-weight: 400; }
+.rbadge {
+  display: inline-block; padding: 2px 12px; border-radius: 999px;
+  background: var(--tint); border: 1px solid var(--line);
+  color: var(--accent); font-size: 14px; font-weight: 600;
+}
+.pts { list-style: none; padding: 0; margin: 0 0 4px; }
+.pts li { position: relative; padding-left: 17px; margin: 7px 0; }
+.pts li::before {
+  content: ""; position: absolute; left: 3px; top: .68em;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--muted); opacity: .55;
+}
+.entry .src {
+  margin: 12px 0 0; padding-top: 9px; border-top: 1px dotted var(--line);
+  font-size: 13px; color: var(--muted); line-height: 1.9;
+}
+.entry .src .lbl { font-weight: 600; color: var(--muted); }
+.entry .feat {
+  margin: 11px 0 2px; padding: 10px 14px;
+  border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+  background: var(--accent-soft); font-size: 14.5px;
+}
+.entry .feat .lbl { color: var(--accent); font-weight: 700; margin-right: 6px; }
+
+/* ---------------- 板块五：建议 ---------------- */
+.advice { list-style: none; padding: 0; margin: 0; counter-reset: adv; }
+.advice li {
+  counter-increment: adv; position: relative;
+  padding: 13px 0 13px 40px; border-top: 1px dashed var(--line);
+}
+.advice li:first-child { border-top: 0; }
+.advice li::before {
+  content: counter(adv); position: absolute; left: 0; top: 13px;
+  width: 25px; height: 25px; border-radius: 8px;
+  background: var(--tint); border: 1px solid var(--line); color: var(--accent);
+  font-size: 13px; font-weight: 700; line-height: 24px; text-align: center;
+}
+.advice .adv-lead { margin: 0 0 6px; font-weight: 600; font-size: 15.5px; }
+.advice p { margin: 0; }
+.signoff {
+  margin: 14px 0 0; padding-top: 10px; border-top: 1px dotted var(--line);
+  color: var(--muted); font-size: 12.5px;
+}
+
+@media (max-width: 520px) {
+  .wrap { padding: 16px 15px 56px; }
+  .archive li { flex-direction: column; gap: 2px; }
+  .card { padding: 15px 15px 11px; }
+  .hero { padding: 18px 16px 15px; }
+  .hero h1 .h1b { font-size: 23px; margin-left: 8px; }
+  .sec-count { display: none; }
+  .toc .tc { display: none; }
+  .entry-head { font-size: 15.5px; }
+}
+"""
+
+# 配色切换脚本。
+#
+# ⚠️ 必须内联在 `<head>`、**在 <body> 之前同步执行**。挂到 `</body>` 前会让深色用户先看到
+# 一帧白底的闪屏（FOUC）—— 而那正是最需要这个按钮的人。
+#
+# 为什么这一段用 JS、而"图文版/文字版"那道用纯 CSS：配色要覆盖系统设置就必须改 `:root`
+# 上的变量，而 `.wrap` 里的 radio 够不到 `:root`（`:has()` 能做但太脆），更要命的是
+# `body` 自己的背景色只认 `:root` 的值 —— 用纯 CSS 会出现"卡片变色、页面底色不变"的破绽。
+# 而**没有 JS 时代价很小**：页面照样跟随系统，按钮自己 `hidden` 不显示，不会留一个点了
+# 没反应的假按钮。视图切换反过来 —— 它影响内容本身，所以那边坚持纯 CSS。
+#
+# ⚠️ 下面是**静态字面量**，每次生成逐字节相同，不影响站点的幂等性。别往里塞时间戳。
+_THEME_SCRIPT = """
+(function(){
+  var K='weekly-theme', root=document.documentElement;
+  try{
+    var s=localStorage.getItem(K);
+    if(s==='dark'||s==='light')root.setAttribute('data-theme',s);
+  }catch(e){}
+  function wire(){
+    var b=document.getElementById('themebtn');
+    if(!b)return;
+    var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+    function cur(){
+      return root.getAttribute('data-theme')||((mq&&mq.matches)?'dark':'light');
+    }
+    function paint(){b.textContent=(cur()==='dark')?'浅色':'深色';}
+    b.addEventListener('click',function(){
+      var next=(cur()==='dark')?'light':'dark';
+      root.setAttribute('data-theme',next);
+      try{localStorage.setItem(K,next);}catch(e){}
+      paint();
+    });
+    b.hidden=false;
+    paint();
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',wire);
+  }else{
+    wire();
+  }
+})();
+"""
+
+# `- <https://…>` 尖括号自动链接。build_report() 在"正文一个链接都没有"时的
+# 「## 参考来源」兜底分支产出的正是这种写法。
+_ANGLE_URL_RE = re.compile(r"<(https?://[^>\s]+)>")
+
+
+def _assert_inline_blocks_safe() -> None:
+    """`_PAGE_CSS` / `_THEME_SCRIPT` 是**内联**进 HTML 的，必须不含各自的结束标签。
+
+    `<style>` 与 `<script>` 都是 HTML 的 raw-text 元素，**只被对应的结束标签终止** ——
+    在样式表的一条注释里提到 `</style>`，整个样式块就会在那里被截断，页面退化成裸文本。
+    这两个常量都是手工维护的长字符串，注释里顺手写出标签名是很自然的动作，所以设这道守卫。
+
+    症状是"页面突然完全没样式"，排查起来会先怀疑浏览器缓存、Pages 构建、模板…… 与其那样，
+    不如在 `python main.py` 启动时就非 0 退出。
+    """
+    for name, text, closer in (
+        ("_PAGE_CSS", _PAGE_CSS, "</style"),
+        ("_THEME_SCRIPT", _THEME_SCRIPT, "</script"),
+    ):
+        if closer in text.lower():
+            raise ValueError(
+                f"{name} 里出现了 {closer}>。它会被内联进 HTML，把该块提前截断，"
+                "请改写那段注释（不要写出尖括号标签名）。"
+            )
+
+
+_assert_inline_blocks_safe()
+
+# `**粗体**`。⚠️ `[^*\n]` 里的 `\n` 不能去掉 —— 允许粗体跨行的话，正文里一个落单的
+# `*` 会跟下一行的 `**` 配对，把中间整句吃掉。这里按行处理本来就遇不到 \n，
+# 显式排除是防将来有人改成整段处理。
+_BOLD_RE = re.compile(r"\*\*(?!\s)([^*\n]+?)\*\*")
+
+# 板块四的地区分组行：`**北美**` 独占一行。（`**来源**：…` 结尾还有冒号和内容，
+# 不匹配这个"整行只有加粗"的形状。）
+_DIGEST_REGION_RE = re.compile(r"^\*\*([^*]+)\*\*$")
+
+# 归档索引里，哪些加粗行不是地区名。
+_DIGEST_REGION_SKIP = frozenset({"来源", "特点", "摘要", "总结"})
+
+# docs/ 下合法的期号文件名。**只认严格的小写 YYYY-MM-DD.md** —— workflow 里的
+# 提交白名单正则就是这个形状，两处必须一致，否则 CI 会因为"白名单外的路径"硬失败。
+_ISSUE_FILE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.md$")
+
+
+def _write_text(path: Path, text: str) -> None:
+    """统一按 UTF-8 + LF 落盘。
+
+    ⚠️ 两个参数都不是可选的：漏掉 `encoding` 在 Windows 上会写成 cp936（Pages 上是乱码），
+    漏掉 `newline="\\n"` 会产生 .gitattributes 注释里描述的那种**整文件级假 diff**。
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+
+
+def _inline_text(raw: str) -> str:
+    """转义 HTML 特殊字符，再把 `**粗体**` 转成 <strong>。"""
+    # quote=True 不能省：报告内容来自公网检索，一个带 `"` 的 URL 能从 href="…" 里逃逸出去。
+    return _BOLD_RE.sub(r"<strong>\1</strong>", html.escape(raw, quote=True))
+
+
+def _anchor(url: str, label: str) -> str:
+    return (
+        f'<a href="{html.escape(url, quote=True)}" target="_blank" '
+        f'rel="noopener noreferrer">{_inline_text(label)}</a>'
+    )
+
+
+def _inline(raw: str) -> str:
+    """把一行的行内语法转成 HTML。**输入是未转义的原文。**
+
+    ⚠️ 尖括号自动链接必须在 HTML 转义**之前**认出来：`<https://…>` 一旦被转义成
+    `&lt;https://…&gt;` 就再也认不出来了。所以先用占位符把它换走，转义与替换都做完
+    再换回来。
+    """
+    holders: list[str] = []
+
+    def _stash(match: re.Match[str]) -> str:
+        holders.append(_anchor(match.group(1), match.group(1)))
+        return f"\x00{len(holders) - 1}\x00"
+
+    raw = _ANGLE_URL_RE.sub(_stash, raw)
+
+    pieces: list[str] = []
+    pos = 0
+    # ⚠️ 逐字复用 MARKDOWN_LINK_RE，不要另写一条匹配规则。否则**网页上可点的链接和
+    # 台账里记的链接会分成两套**，静默漂移，而且没人会发现。
+    for match in MARKDOWN_LINK_RE.finditer(raw):
+        # 这条正则只捕获 URL，起点落在 `](` 的 `]` 上，所以往回找配对的 `[`。
+        open_at = raw.rfind("[", pos, match.start())
+        if open_at < 0:
+            continue
+        url = match.group(1)
+        pieces.append(_inline_text(raw[pos:open_at]))
+        # 正则已经要求 https?://，这里再判一次是刻意留的冗余：将来若有人放宽了那条
+        # 正则，这一行仍然挡得住 javascript: 之类的伪协议。
+        if url.startswith(("http://", "https://")):
+            pieces.append(_anchor(url, raw[open_at + 1:match.start()]))
+        else:
+            pieces.append(_inline_text(raw[open_at:match.end()]))
+        pos = match.end()
+    pieces.append(_inline_text(raw[pos:]))
+
+    text = "".join(pieces)
+    for index, snippet in enumerate(holders):
+        text = text.replace(f"\x00{index}\x00", snippet)
+    return text
+
+
+def markdown_to_html(md: str, id_prefix: str = "sec-") -> str:
+    """把报告 Markdown 渲染成 HTML。**只覆盖本项目自己产出的封闭子集。**
+
+    支持的块级语法：`# ` / `## ` / `### ` / `> ` / `- ` / `1. ` / `---` / 空行 / 其它段落。
+
+    ⚠️ `id_prefix` 不是可有可无的：单期页面里**图文版和文字版同时存在**（靠 CSS 切换
+    显隐），两边都会给二级标题生成 id。用同一个前缀就会在同一份文档里出现重复 id ——
+    目录的 `#sec-1` 会跳到 DOM 里靠前的那个匹配上，而那个可能正躺在被隐藏的视图里，
+    点了没反应。所以图文版用 `sec-`、文字版用 `p-sec-`。
+    """
+    out: list[str] = []
+    para: list[str] = []                 # 累积中的段落行
+    items: list[list[str]] = []          # 当前列表的条目，每条是若干行（首行 + 缩进续行）
+    list_kind: str | None = None         # "ul" / "ol"
+    in_fence = False
+    h2_seen = 0
+
+    def flush_para() -> None:
+        nonlocal para
+        if para:
+            out.append("<p>" + "<br>\n".join(_inline(l) for l in para) + "</p>")
+            para = []
+
+    def flush_list() -> None:
+        nonlocal items, list_kind
+        if items and list_kind:
+            body = "".join(
+                "<li>" + "<br>\n".join(_inline(l) for l in item) + "</li>"
+                for item in items
+            )
+            out.append(f"<{list_kind}>{body}</{list_kind}>")
+        items = []
+        list_kind = None
+
+    def flush_all() -> None:
+        flush_para()
+        flush_list()
+
+    for raw_line in md.split("\n"):
+        stripped = raw_line.strip()
+
+        # ``` 围栏：整段原样输出，不解析里面的任何标记。
+        # 提示词没让模型写代码块，但检索内容偶尔会渗进来。
+        if stripped.startswith("```"):
+            flush_all()
+            in_fence = not in_fence
+            out.append("<pre><code>" if in_fence else "</code></pre>")
+            continue
+        if in_fence:
+            out.append(html.escape(raw_line))
+            continue
+
+        # ⚠️ 缩进的续行要并进上一个条目/段落。板块五的每条建议都有缩进续行，
+        # 若按 CommonMark 的"4 空格 = 代码块"处理，每条建议的第二段会掉出列表、
+        # 整节散架。
+        if stripped and raw_line[:1] in (" ", "\t"):
+            if items:
+                items[-1].append(stripped)
+            elif para:
+                para.append(stripped)
+            else:
+                para.append(stripped)
+            continue
+
+        if not stripped:
+            flush_all()
+            continue
+
+        if stripped.startswith("### "):
+            flush_all()
+            out.append(f"<h3>{_inline(stripped[4:])}</h3>")
+        elif stripped.startswith("## "):
+            flush_all()
+            h2_seen += 1
+            out.append(f'<h2 id="{id_prefix}{h2_seen}">{_inline(stripped[3:])}</h2>')
+        elif stripped.startswith("# "):
+            flush_all()
+            out.append(f"<h1>{_inline(stripped[2:])}</h1>")
+        elif stripped.startswith("> "):
+            flush_all()
+            out.append(f"<blockquote>{_inline(stripped[2:])}</blockquote>")
+        elif stripped.startswith("- ") or stripped == "-":
+            flush_para()
+            if list_kind != "ul":
+                flush_list()
+                list_kind = "ul"
+            items.append([stripped[2:].strip()])
+        elif re.match(r"^\d+[.)]\s", stripped):
+            flush_para()
+            if list_kind != "ol":
+                flush_list()
+                list_kind = "ol"
+            items.append([re.sub(r"^\d+[.)]\s+", "", stripped)])
+        elif stripped.startswith("---") and "|" not in stripped:
+            flush_all()
+            out.append("<hr>")
+        else:
+            # ⚠️ 这个分支必须存在：板块四的 `**北美**` 独立加粗行不属于上面任何一种
+            # 标记，会落到这里。没有它，板块四整节的可读性就没了。
+            #
+            # 另外 `---` 那条规则刻意排除了含 `|` 的行：模型万一渗出 Markdown 表格，
+            # `|---|---|` 分隔行会被渲染成一条横线、把表格劈开。
+            flush_list()
+            para.append(stripped)
+
+    flush_all()
+    return "\n".join(out)
+
+
+def _report_title(md: str) -> str:
+    """取报告的一级标题文字（去掉 `# `）。"""
+    for line in md.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            return stripped[2:].strip()
+    return "储能结构周报"
+
+
+def _page_shell(
+    title: str, nav: str, body: str, footer: str, *, has_toggle: bool = False
+) -> str:
+    """`has_toggle` 决定要不要输出视图切换控件、以及给 .wrap 挂 `has-toggle`。
+
+    ⚠️ `has-toggle` 是**显隐规则的总开关**：`.has-toggle .view { display:none }` 只在单期
+    页面上生效。归档首页没有切换控件，如果无脑给它加上这个类，整页内容会被藏起来变成白屏。
+    所以由调用方显式声明，不要改成"有 .view 就隐藏"。
+    """
+    if has_toggle:
+        radios = (
+            '<input type="radio" name="view" id="v-rich" class="vmode" checked>'
+            '<input type="radio" name="view" id="v-plain" class="vmode">'
+        )
+        switch = (
+            '<span class="vswitch">'
+            '<label for="v-rich">图文版</label><label for="v-plain">文字版</label>'
+            "</span>"
+        )
+    else:
+        # 归档页不输出 radio，也不挂 .has-toggle —— 整页正常显示，不会被藏起来。
+        radios = ""
+        switch = ""
+    # ⚠️ `radio → .ctrls → .view` 的兄弟顺序不能变，CSS 用的是 `~`。
+    # 配色按钮两个页面都有（在单期页选了深色，跳回归档不该变回浅色）。
+    body = (
+        f'{radios}<div class="ctrls">{switch}'
+        f'<button type="button" class="themebtn" id="themebtn" hidden>深色</button></div>'
+        f"{body}"
+    )
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{html.escape(title)}</title>
+<script>{_THEME_SCRIPT}</script>
+<style>{_PAGE_CSS}</style>
+</head>
+<body>
+<div class="wrap{' has-toggle' if has_toggle else ''}">
+{nav}
+{body}
+<footer>{footer}</footer>
+</div>
+</body>
+</html>
+"""
+
+
+def _nav(prev_date: str, next_date: str, index_name: str) -> str:
+    """顶部导航。用**相对链接**，这样本地直接双击打开 docs/ 里的文件也能跳。"""
+    left = (
+        f'<a href="{prev_date}.html">← 上一期</a>'
+        if prev_date else '<span class="disabled">← 上一期</span>'
+    )
+    right = (
+        f'<a href="{next_date}.html">下一期 →</a>'
+        if next_date else '<span class="disabled">下一期 →</span>'
+    )
+    return (
+        f'<nav class="top">{left}'
+        f'<a href="{index_name}">全部往期</a>'
+        f"{right}</nav>"
+    )
+
+
+# ---------------- 图文版：报告头 + 目录 + 板块卡片 + 条目 ----------------
+
+# `## 一、便携&阳台储能竞品动态` → 序号「一」+ 标题
+_SECTION_HEAD_RE = re.compile(r"^##\s*([一二三四五六七八九十]+)\s*[、.．]\s*(.+?)\s*$")
+# `### 1. **BLUETTI** —— Balco 500` → 序号 1 + 其余
+_ENTRY_HEAD_RE = re.compile(r"^###\s+(\d+)\s*[.、)）]\s*(.+?)\s*$")
+# `**BLUETTI** —— Balco 500` → 厂商 + 标题
+_ENTRY_SPLIT_RE = re.compile(r"^\*\*(.+?)\*\*\s*——\s*(.+)$")
+# `**来源**：…` / `来源：…`（`\**` 让加粗与不加粗两种写法都吃）
+_SRC_LINE_RE = re.compile(r"^\**\s*来源\s*\**\s*[:：]\s*(.*)$")
+_FEAT_LINE_RE = re.compile(r"^\**\s*特点\s*\**\s*[:：]\s*(.*)$")
+# 建议条目的首句（整句加粗）
+_ADV_LEAD_RE = re.compile(r"^\*\*(.+?)\*\*\s*(.*)$", re.S)
+# HTML 注释。`example_report.md` 顶部就有一大段给使用者看的说明。
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+# 正文末尾的落款行（`—— 本消息由自动化脚本生成…`）。它是 `build_report()` 拼进去的，
+# 不是给模型写的，所以不能跟正文混在一起渲染。
+_SIGNOFF_RE = re.compile(r"^[—–-]{2,}")
+
+
+def _strip_comments(md: str) -> str:
+    """去掉 HTML 注释后再渲染。
+
+    实时报告由 `build_report()` 拼装、不含注释，但**万一模型吐出一段注释**，纯文字版会
+    把它当普通段落整段显示给读者。
+
+    ⚠️ 只影响渲染。`write_issue_source()` 落进 docs/ 的 `.md` **仍是逐字节原文** ——
+    那是刻意的，真相不该被渲染层动过。
+    """
+    return _HTML_COMMENT_RE.sub("", md)
+
+
+def _split_sections(md: str) -> tuple[list[str], list[tuple[str, list[str]]]]:
+    """切成 (前言行, [(二级标题, 正文行), ...])。
+
+    **刻意不复用 `group_blocks()`。** 它在 `### ` 上也起新块，用它就得再写一层状态机
+    把 `### ` 块按顺序认回各自所属的 `## `。这里只按 `## ` 切，板块四/五那种没有
+    `### ` 的散文正文自然就留在自己的小节里。
+    """
+    preamble: list[str] = []
+    sections: list[tuple[str, list[str]]] = []
+    for line in md.split("\n"):
+        if line.startswith("## "):
+            sections.append((line.strip()[3:].strip(), []))
+            continue
+        (preamble if not sections else sections[-1][1]).append(line)
+    return preamble, sections
+
+
+def _split_groups(body: list[str]) -> tuple[list[str], list[list[str]]]:
+    """把一个小节的正文切成 (引言行, [组, ...])。
+
+    一个「组」由 `### ` 行、或独占一行的加粗行（板块四的 `**北美**`）开头 ——
+    这两种形状**后续结构完全一样**（分点 + 来源 + 特点），所以共用一套渲染。
+
+    ⚠️ `**来源**` / `**特点**` 也是"独占一行的加粗"形状，必须靠 `_DIGEST_REGION_SKIP`
+    排除，否则每条都会被从中间劈成两个组，第二组只剩来源行。
+    """
+    preamble: list[str] = []
+    groups: list[list[str]] = []
+    for line in body:
+        stripped = line.strip()
+        starts = stripped.startswith("### ")
+        if not starts:
+            matched = _DIGEST_REGION_RE.match(stripped)
+            starts = bool(matched) and matched.group(1).strip() not in _DIGEST_REGION_SKIP
+        if starts:
+            groups.append([line])
+        elif groups:
+            groups[-1].append(line)
+        else:
+            preamble.append(line)
+    return preamble, groups
+
+
+def _plain_words(text: str) -> str:
+    """把多行纯文本接成一行 HTML（行间用 <br>），供 `_inline` 之外的零散片段用。"""
+    return "<br>\n".join(_inline(l) for l in text.split("\n") if l.strip())
+
+
+def _rich_group(lines: list[str]) -> str:
+    """渲染一个「组」：条目（`### `）或地区分组（`**北美**`）。"""
+    head = lines[0].strip()
+    bullets: list[str] = []
+    srcs: list[str] = []
+    feats: list[str] = []
+    other: list[str] = []
+
+    for raw in lines[1:]:
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("- ") or stripped == "-":
+            bullets.append(stripped[2:].strip())
+            continue
+        matched = _SRC_LINE_RE.match(stripped)
+        if matched:
+            srcs.append(matched.group(1))
+            continue
+        matched = _FEAT_LINE_RE.match(stripped)
+        if matched:
+            feats.append(matched.group(1))
+            continue
+        other.append(raw)
+
+    if head.startswith("### "):
+        index = ""
+        text = head[4:].strip()
+        matched = _ENTRY_HEAD_RE.match(head)
+        if matched:
+            index, text = matched.group(1), matched.group(2)
+        split = _ENTRY_SPLIT_RE.match(text)
+        if split:
+            inner = (
+                f'<span class="vendor">{_inline(split.group(1))}</span>'
+                f'<span class="dash"> —— </span>'
+                f'<span class="etitle">{_inline(split.group(2))}</span>'
+            )
+        else:
+            # 模型偶尔不按 `**厂商** —— 标题` 写。整条照原样渲染，不要丢内容。
+            inner = _inline(text)
+        badge = f'<span class="idx">{index}</span>' if index else ""
+        head_html = f'<h3 class="entry-head">{badge}{inner}</h3>'
+    else:
+        # 地区分组行。`**北美**` 这种整行加粗已被 `_split_groups` 认成组头。
+        matched = _DIGEST_REGION_RE.match(head)
+        label = matched.group(1).strip() if matched else head
+        head_html = (
+            f'<h3 class="entry-head"><span class="rbadge">{_inline(label)}</span></h3>'
+        )
+
+    out = ['<article class="entry">', head_html]
+    if bullets:
+        out.append('<ul class="pts">')
+        out.extend(f"<li>{_inline(b)}</li>" for b in bullets)
+        out.append("</ul>")
+    if other:
+        # 组里冒出的、认不出的段落（模型偶尔加个过渡句）。退回纯 markdown 渲染，
+        # 宁可排版朴素也不要丢字。
+        out.append(markdown_to_html("\n".join(other), id_prefix="r-other-"))
+    if srcs:
+        out.append(
+            f'<p class="src"><span class="lbl">来源</span> {_inline(" ".join(srcs))}</p>'
+        )
+    for feat in feats:
+        out.append(f'<p class="feat"><span class="lbl">特点</span> {_inline(feat)}</p>')
+    out.append("</article>")
+    return "\n".join(out)
+
+
+def _rich_advice(lines: list[str]) -> str:
+    """板块五：编号建议单独排版；若一条都认不出，整段退回纯 markdown。"""
+    items: list[list[str]] = []
+    lead_in: list[str] = []
+    signoff: list[str] = []
+    for raw in lines:
+        stripped = raw.strip()
+        # ⚠️ 落款行必须**先**认出来。它是正文的最后一行、又不是编号条目，否则会掉进
+        # 下面那个 `elif items` 分支、被追加到**最后一条建议**上，看起来像建议 3 的
+        # 一部分。它不是模型写的，也不该冒充建议。
+        if _SIGNOFF_RE.match(stripped):
+            signoff.append(stripped)
+            continue
+        matched = re.match(r"^\d+[.)、]\s+(.*)$", stripped)
+        # 缩进行是上一条的续行，不是新条目 —— 板块五每条都有缩进续行，
+        # 判错会让每条建议都被劈成「标题一条 + 正文一条」。
+        if matched and not raw[:1].isspace():
+            items.append([matched.group(1)])
+        elif items:
+            items[-1].append(stripped)
+        else:
+            lead_in.append(raw)
+
+    if not items:
+        return markdown_to_html("\n".join(lines), id_prefix="r-plain-")
+
+    out: list[str] = []
+    if lead_in:
+        out.append(markdown_to_html("\n".join(lead_in), id_prefix="r-lead-"))
+    out.append('<ol class="advice">')
+    for item in items:
+        text = "\n".join(item).strip()
+        matched = _ADV_LEAD_RE.match(text)
+        if matched:
+            out.append(f'<li><p class="adv-lead">{_inline(matched.group(1))}</p>')
+            rest = matched.group(2).strip()
+        else:
+            out.append("<li>")
+            rest = text
+        if rest:
+            out.append(f"<p>{_plain_words(rest)}</p>")
+        out.append("</li>")
+    out.append("</ol>")
+    # 落款留一行，但**不要丢掉** —— 站点的页脚是另一回事，正文里的这句是报告的一部分。
+    for line in signoff:
+        out.append(f'<p class="signoff">{_inline(line)}</p>')
+    return "\n".join(out)
+
+
+def _rich_hero(title: str, preamble: list[str], date_str: str, total: int) -> str:
+    """报告头：小标 + 大日期 + 信息 chips。"""
+    name = title
+    if DINGTALK_KEYWORD and name.startswith(DINGTALK_KEYWORD):
+        name = name[len(DINGTALK_KEYWORD):].strip()
+    # 去掉标题里的 `（2026-09-24）` —— 日期已经在 h1 里单列了，重复一次只是噪音。
+    name = re.sub(r"[（(][^）)]*[）)]\s*$", "", name).strip() or "储能结构周报"
+
+    quote = next(
+        (l.strip()[2:].strip() for l in preamble if l.strip().startswith("> ")), ""
+    )
+    chips = [f"本期 {total} 条"]
+    if quote:
+        chips.extend(p.strip() for p in quote.split("｜") if p.strip())
+    chips_html = "".join(f'<span class="chip">{_inline(c)}</span>' for c in chips)
+
+    # ⚠️ 前言里除了 `# ` 标题和 `> ` 引用行，**剩下的正文一行都不能丢**。
+    # 目前模型不会在板块一之前写引子，但上面那句"只捞 `> ` 行"的写法会把这些内容
+    # 静默吞掉 —— 那正是本项目最忌讳的失败模式。宁可多渲染一段。
+    leftovers = [
+        line for line in preamble
+        if line.strip() and not line.lstrip().startswith(("#", ">"))
+    ]
+    lead = ""
+    if leftovers:
+        lead = (
+            '<div class="lead">'
+            + markdown_to_html("\n".join(leftovers), id_prefix="r-preamble-")
+            + "</div>"
+        )
+
+    return (
+        '<header class="hero">'
+        f'<div class="kicker">{_inline(name)}</div>'
+        f"<h1>{_inline(date_str)}</h1>"
+        f'<div class="meta">{chips_html}</div>'
+        f"{lead}"
+        "</header>"
+    )
+
+
+def render_rich(md: str, date_str: str) -> str:
+    """单期页面的图文版正文：报告头 + 目录 + 五个板块卡片。
+
+    **任何一处解析不出来都要退回 `markdown_to_html()`，绝不能丢字。** 报告结构由提示词
+    保证，但模型会漂移；排版崩了是小事，内容消失是大事。
+    """
+    md = _strip_comments(md)
+    preamble, sections = _split_sections(md)
+    total = len(extract_entries(md))
+
+    parsed: list[dict] = []
+    for index, (heading, body) in enumerate(sections):
+        matched = _SECTION_HEAD_RE.match("## " + heading)
+        num = matched.group(1) if matched else str(index + 1)
+        title = matched.group(2) if matched else heading
+        pre, groups = _split_groups(body)
+        if groups:
+            kind = "entry" if groups[0][0].strip().startswith("### ") else "region"
+        else:
+            kind = "advice"
+        if kind == "entry":
+            count = f"{len(groups)} 条"
+        elif kind == "region":
+            count = f"{len(groups)} 个地区"
+        else:
+            n = len(re.findall(r"^\d+[.)、]\s", "\n".join(body), re.M))
+            count = f"{n} 点建议" if n else ""
+        parsed.append({
+            "id": f"sec-{index + 1}", "num": num, "title": title, "count": count,
+            "pre": pre, "groups": groups, "kind": kind, "body": body,
+        })
+
+    if parsed:
+        rows = "".join(
+            f'<li><a href="#{item["id"]}"><span class="tn">{_inline(item["num"])}</span>'
+            f'<span class="toc-t2">{_inline(item["title"])}</span>'
+            f'<span class="tc">{_inline(item["count"])}</span></a></li>'
+            for item in parsed
+        )
+        toc = f'<div class="toc"><div class="toc-t">本期目录</div><ul>{rows}</ul></div>'
+    else:
+        toc = ""
+
+    cards: list[str] = []
+    for item in parsed:
+        if item["groups"]:
+            inner = [_rich_group(g) for g in item["groups"]]
+            # ⚠️ `pre` 只在这条分支里渲染。**没有分组时 `pre` 就是整个正文**
+            # （`_split_groups` 的语义是"第一个分组之前的行"，没有分组就没有"之前"），
+            # 而下面那个分支已经用 `_rich_advice` 把整段渲染过一遍了 —— 再渲染一次
+            # 会让整个板块**原样出现两遍**。板块五就是这样：它是散文、没有 `### `，
+            # 于是"建议列表"上面还压着一份纯 markdown 的同一段内容。
+            if item["pre"] and any(l.strip() for l in item["pre"]):
+                inner.insert(0, markdown_to_html("\n".join(item["pre"]), id_prefix="r-pre-"))
+        else:
+            inner = [_rich_advice(item["body"])]
+        head = (
+            f'<div class="sec-head"><span class="sec-num">{_inline(item["num"])}</span>'
+            f'<span class="sec-title">{_inline(item["title"])}</span>'
+            f'<span class="sec-count">{_inline(item["count"])}</span></div>'
+        )
+        cards.append(
+            f'<section class="card" id="{item["id"]}">{head}{"".join(inner)}</section>'
+        )
+
+    if not parsed:
+        # 一个二级标题都没认出来（报告结构整个塌了）。退回纯 markdown，不硬套版式。
+        return markdown_to_html(md, id_prefix="sec-")
+
+    return (
+        _rich_hero(_report_title(md), preamble, date_str, total)
+        + toc
+        + "".join(cards)
+    )
+
+
+def render_issue_page(
+    md: str, *, date_str: str, prev_date: str, next_date: str, index_name: str
+) -> str:
+    """单期页面：图文版与文字版**同时**写进 HTML，靠顶部的 radio 切换显隐。
+
+    两者都服务端渲染，所以关掉 JS 也能用（邮件客户端、RSS 阅读器是常态场景）。
+    radio 与控件行由 `_page_shell` 输出 —— 顺序在那边保证，这里只管两个视图。
+    """
+    md = _strip_comments(md)
+    body = (
+        f'<div class="view view-rich"><main>{render_rich(md, date_str)}</main></div>'
+        f'<div class="view view-plain"><main>'
+        # 文字版刻意就是原来那套渲染。id 前缀换成 p-，避免和图文版的 sec-N 撞车 ——
+        # 同一份文档里重复 id 会让目录锚点跳到被隐藏的那个视图上，点了没反应。
+        f'{markdown_to_html(md, id_prefix="p-")}</main></div>'
+    )
+    return _page_shell(
+        _report_title(md),
+        _nav(prev_date, next_date, index_name),
+        body,
+        "本页由脚本自动生成 ｜ 检索源：Perplexity sonar-pro-search",
+        has_toggle=True,
+    )
+
+
+def render_index_page(issues: list[dict], index_name: str) -> str:
+    if issues:
+        rows = "\n".join(
+            f'<li><a class="d" href="{item["date"]}.html">{item["date"]}</a>'
+            f'<span class="sub">{html.escape(item["title"])}'
+            f' ｜ {item["count"]} 条</span></li>'
+            for item in issues
+        )
+        body = (
+            f'<p class="sub">共 {len(issues)} 期 ｜ 最新一期 '
+            f'{issues[0]["date"]}</p>\n<ul class="archive">\n{rows}\n</ul>'
+        )
+    else:
+        body = '<p class="none">还没有往期报告。</p>'
+    return _page_shell(
+        "储能结构周报 · 往期归档",
+        '<nav class="top"><span class="disabled">← 上一期</span>'
+        '<span>往期归档</span>'
+        '<span class="disabled">下一期 →</span></nav>',
+        f"<h1>储能结构周报 · 往期归档</h1>\n{body}",
+        "本页由脚本自动生成 ｜ 每期报告都会自动出现在这里",
+    )
+
+
+def collect_issues(docs_dir: Path) -> list[dict]:
+    """扫 docs/*.md，按日期倒序返回历期。文件名不合规的一律跳过。"""
+    issues: list[dict] = []
+    if not docs_dir.is_dir():
+        return issues
+    for path in sorted(docs_dir.glob("*.md")):
+        matched = _ISSUE_FILE_RE.match(path.name)
+        if not matched:
+            continue
+        try:
+            md = path.read_text(encoding="utf-8")
+        except OSError as exc:      # noqa: PERF203
+            LOG.warning("归档文件 %s 读取失败，跳过：%s", path.name, exc)
+            continue
+        issues.append({
+            "date": matched.group(1),
+            "title": _report_title(md),
+            "count": len(extract_entries(md)),
+            "md": md,
+        })
+    issues.sort(key=lambda item: item["date"], reverse=True)
+    return issues
+
+
+def write_issue_source(docs_dir: Path, date_str: str, report: str) -> Path:
+    """把当期报告原文落到 docs/<日期>.md。**逐字节就是 report，不要写清洗过的版本** ——
+    否则台账、推送正文、网页会变成三份互不相同的文档。"""
+    path = docs_dir / f"{date_str}.md"
+    _write_text(path, report)
+    return path
+
+
+def build_site(docs_dir: Path) -> list[Path]:
+    """从 docs/*.md 全量重建所有 .html 与归档首页。幂等。"""
+    issues = collect_issues(docs_dir)
+    dates = [item["date"] for item in issues]           # 已按倒序
+    written: list[Path] = []
+    for index, item in enumerate(issues):
+        # dates 是倒序的，所以"上一期"在更后面、"下一期"在更前面。
+        newer = dates[index - 1] if index > 0 else ""
+        older = dates[index + 1] if index + 1 < len(dates) else ""
+        page = render_issue_page(
+            item["md"],
+            date_str=item["date"],
+            prev_date=older,
+            next_date=newer,
+            index_name=SITE_INDEX_NAME,
+        )
+        path = docs_dir / f"{item['date']}.html"
+        _write_text(path, page)
+        written.append(path)
+    index_path = docs_dir / SITE_INDEX_NAME
+    _write_text(index_path, render_index_page(issues, SITE_INDEX_NAME))
+    written.append(index_path)
+    return written
+
+
+def _digest_titles(section_blocks: list[str], limit: int = 2) -> list[str]:
+    """取某个板块的头几条 `### ` 条目标题（模型按重要性排，所以取最前面的）。"""
+    titles: list[str] = []
+    for chunk in section_blocks:
+        for line in chunk.split("\n"):
+            if not line.lstrip().startswith("### "):
+                continue
+            title = strip_entry_title(line)
+            if title:
+                titles.append(title)
+            if len(titles) >= limit:
+                return titles
+    return titles
+
+
+def _digest_regions(section_blocks: list[str]) -> list[str]:
+    """取板块四里的地区分组名（`**北美**` 这种独占一行的加粗行）。"""
+    regions: list[str] = []
+    for chunk in section_blocks:
+        for line in chunk.split("\n"):
+            matched = _DIGEST_REGION_RE.match(line.strip())
+            if not matched:
+                continue
+            name = matched.group(1).strip()
+            if name and name not in _DIGEST_REGION_SKIP and name not in regions:
+                regions.append(name)
+    return regions
+
+
+def build_digest(report: str, today: datetime, base_url: str) -> str:
+    """生成推到钉钉群的那条短消息：各板块头条 + 网页链接。
+
+    ⚠️ **五个板块的形态不一样，不能用一套规则套。** 按 `_section_of_blocks()` 的语义，
+    板块四**没有 `### ` 块**（首行是 `**北美**` 这种独立加粗行），板块五整节是 `other` 块
+    （首行是 `1. **…**`）。不分清的话，摘要会静默地只剩三个板块。
+
+    摘要完全从报告本地抽取，**不额外调 API**。
+    """
+    blocks, tags = _section_of_blocks(report)
+    by_section: dict[str, list[str]] = {}
+    for block, (_kind, section) in zip(blocks, tags):
+        if section:
+            by_section.setdefault(section, []).append("\n".join(block))
+
+    date_str = today.strftime("%Y-%m-%d")
+    start, end = _window(today)
+    entries = extract_entries(report)
+
+    lines = [
+        f"{DINGTALK_KEYWORD} 储能结构周报（{date_str}）",
+        "",
+        f"本期 {len(entries)} 条 ｜ 覆盖 {start} ~ {end}",
+    ]
+
+    # 板块一~三：各自的 `### ` 条目标题，每节最多 2 条。
+    for heading in SECTION_HEADINGS[:3]:
+        titles = _digest_titles(by_section.get(heading, []))
+        if not titles:
+            continue
+        lines += ["", f"**{heading[3:]}**"]
+        lines += [f"· {title}" for title in titles]
+
+    # 板块四：没有 `### `，取地区分组行。没有动态的地区已被提示词要求省略，
+    # 所以这里列出的就是本周期真正有内容的地区。
+    regions = _digest_regions(by_section.get(SECTION_HEADINGS[3], []))
+    if regions:
+        lines += ["", f"**{SECTION_HEADINGS[3][3:]}**", "· " + " ｜ ".join(regions)]
+
+    # 板块五：散文，抽不出干净的一句话，给固定说明即可。
+    lines += ["", f"**{SECTION_HEADINGS[4][3:]}**", "· 3 点结构建议（详见全文）"]
+
+    if base_url:
+        lines += [
+            "",
+            # ⚠️ 这里必须用 `[文字](网址)` 的**显式链接**写法，不要写裸 URL。
+            # 理由：正文里所有链接本来就是这个写法，已经连续几周在群里验证过能点；
+            # 裸 URL 走的是钉钉**另一套**自动识别机制，本项目从未验证过。归档那条
+            # 还以 `/` 结尾，正是自动识别最容易判错链接边界的地方。
+            # 显式写法把边界写死，不依赖渲染器的猜测。
+            f"📄 [本期全文]({base_url}/{date_str}.html)",
+            # 归档链接和当期链接**一起给**：万一当期页面因为提交失败没发出去，
+            # 读者至少能落到一个可用的索引上。
+            f"📚 [往期归档]({base_url}/)",
+        ]
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # 消息分段
 # ---------------------------------------------------------------------------
 
@@ -1530,7 +2702,10 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true",
                         help="只打印 Markdown，不推送钉钉")
     parser.add_argument("--out", default="", metavar="PATH",
-                        help="把生成的 Markdown 另存为文件，便于推送前审阅")
+                        help="把生成的 Markdown 另存为文件（同时写一份同名 .html），"
+                             "便于推送前审阅")
+    parser.add_argument("--rebuild", action="store_true",
+                        help="只从 docs/*.md 重建网页，不调 API、不推送、不写台账")
     args = parser.parse_args()
 
     # Windows 上输出被重定向（管道 / VSCode 集成终端 / Git Bash）时，Python 会按
@@ -1552,8 +2727,21 @@ def main() -> int:
         stream=sys.stdout,
     )
 
+    # 只重建站点：改了 CSS 想立刻看效果，不必等周一，也不花 API 额度。
+    # 不需要任何环境变量，所以放在 load_config 之前。
+    if args.rebuild:
+        written = build_site(DOCS_DIR)
+        LOG.info("已重建 %d 个网页 → %s", len(written), DOCS_DIR)
+        return 0
+
     cfg = load_config(dry_run=args.dry_run)
     today = datetime.now(BEIJING_TZ)
+    date_str = today.strftime("%Y-%m-%d")
+    base_url = cfg["SITE_BASE_URL"]
+    if not base_url:
+        # ⚠️ 必须显式告警。否则一个配错的变量会让网页功能**静默退回**旧行为，
+        # 而所有结构校验一个都不会响 —— 正是本项目最忌讳的那种失败。
+        LOG.warning("SITE_BASE_URL 为空，网页功能已关闭，将退回推送全文（分段）")
 
     # ⚠️ 传 today.date()（naive date）而不是 today —— 台账里存的是 YYYY-MM-DD，
     # 带时区的 datetime 和 naive date 相减会抛 TypeError，第一天就崩。
@@ -1566,25 +2754,43 @@ def main() -> int:
              len(report), len(citations), len(report.encode("utf-8")))
 
     if args.out:
-        with open(args.out, "w", encoding="utf-8") as fh:
-            fh.write(report)
-        LOG.info("已另存到 %s", args.out)
+        _write_text(Path(args.out), report)
+        # 顺手写一份同名 .html —— 排版是这次改版的重点之一，只给 .md 看不出实际效果。
+        preview = Path(args.out).with_suffix(".html")
+        _write_text(preview, render_issue_page(
+            report, date_str=date_str, prev_date="", next_date="",
+            index_name=SITE_INDEX_NAME,
+        ))
+        LOG.info("已另存到 %s 与 %s（后者可直接用浏览器打开看排版）", args.out, preview)
 
-    messages = plan_messages(report)
+    if base_url:
+        # 新行为：群里只发摘要 + 链接，全文在网页上。
+        messages = [build_digest(report, today, base_url)]
+    else:
+        # 退回旧行为：推送全文（分段）。这条路径是 SITE_BASE_URL 为空时的兜底，
+        # plan_messages 因此不能删。
+        messages = plan_messages(report)
     LOG.info("拆分为 %d 条消息，正文长度 %s 字节",
              len(messages), [len(m.encode("utf-8")) for m in messages])
 
     if args.dry_run:
         for index, text in enumerate(messages, start=1):
-            print("\n" + "=" * 60 + f" 消息 {index}/{len(messages)} " + "=" * 60)
+            print("\n" + "=" * 60
+                  + f" 消息 {index}/{len(messages)}（群里会看到的）" + "=" * 60)
             print(text)
         print("=" * 60 + "\n")
-        # dry-run 只读不写台账 —— 否则"跑一次看看"会把没推出去的内容标成已推送，
-        # 下周被静默压制。
-        LOG.info("dry-run 模式，未推送钉钉，也未写入台账")
+        if base_url:
+            # 群消息变短之后，只打印摘要就没法审阅内容了 —— 全文照旧打一遍。
+            print("=" * 60 + " 报告全文（网页上会看到的内容）" + "=" * 60)
+            print(report)
+            print("=" * 60 + "\n")
+        # dry-run 只读不写 —— 不推钉钉、不写台账、**也不写 docs/**。
+        # docs/ 里落下的会是一个和正式产物同名、内容却不同的文件（每次跑模型输出都不一样），
+        # 一旦被误提交，就是"一期从没推送过的报告"上了公网。
+        LOG.info("dry-run 模式，未推送钉钉，未写入台账，也未生成网页")
         return 0
 
-    title = f"{DINGTALK_KEYWORD} 储能结构周报（{today.strftime('%Y-%m-%d')}）"
+    title = f"{DINGTALK_KEYWORD} 储能结构周报（{date_str}）"
     for index, text in enumerate(messages, start=1):
         send_dingtalk(cfg["DINGTALK_WEBHOOK"], title, text)
         LOG.info("已推送第 %d/%d 条消息", index, len(messages))
@@ -1592,6 +2798,16 @@ def main() -> int:
             time.sleep(MESSAGE_INTERVAL)
 
     LOG.info("推送完成")
+
+    # 站点落盘放在推送**成功之后**，与台账同一条铁律：磁盘上会被提交的东西，
+    # 必须恰好是已经送达读者的东西。中途失败走的是 sys.exit（310000/410100），
+    # SystemExit 不是 Exception，会直接穿过这里 —— 于是这一期不会上公网。
+    # 顺序上站点在前、台账在后：任一步抛异常都会让这一期下周重发，而不是静默丢内容。
+    if base_url:
+        write_issue_source(DOCS_DIR, date_str, report)
+        written = build_site(DOCS_DIR)
+        LOG.info("网页已生成：%d 个文件 → %s", len(written), DOCS_DIR)
+        LOG.info("本期链接（Pages 重建约需 30~60 秒）：%s/%s.html", base_url, date_str)
 
     # ⚠️ 台账**只在全部消息推送成功之后**才写。
     # 中途失败走的是 sys.exit（310000/410100 那两条路径），SystemExit 不是 Exception，

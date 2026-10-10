@@ -52,6 +52,10 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
           DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          # 网页站点根。用 vars（仓库变量）而不是 secrets —— 它不是密钥。
+          # 没配时它展开成**空串**，而 load_config() 把空串当"用默认值"（不是"关闭"），
+          # 所以这里留空不会让网页功能静默失效。真要关闭就把变量设成 off。
+          SITE_BASE_URL: ${{ vars.SITE_BASE_URL }}
         run: python main.py
 
       # ⚠️ 这一步**故意不加 `if: always()`**。旧版（weekly_news.yml）加了，意味着
@@ -61,7 +65,7 @@ jobs:
       #
       # 走到这一步意味着 python main.py 已成功退出，而 main.py 只在**全部消息推送
       # 成功之后**才写台账，所以这里的文件就是权威记录。
-      - name: Commit history ledger
+      - name: Commit history ledger and site
         run: |
           set -euo pipefail
 
@@ -69,28 +73,48 @@ jobs:
             echo "::error::main.py 成功退出却没有生成 pushed_history.json，行为异常，已中止"
             exit 1
           fi
-          if git diff --quiet -- pushed_history.json; then
-            echo "台账无变化（本期没有新增条目），跳过提交"
-            exit 0
+          # 站点是主产物之一。缺了它说明 build_site() 没跑到（或写失败），
+          # 而群里已经发出去了带链接的消息 —— 必须红。
+          if [ ! -d docs ]; then
+            echo "::error::main.py 成功退出却没有生成 docs/，站点未产出，已中止"
+            exit 1
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # ⚠️ 只 add 这一个文件。绝不用 `git add -A` / `git add .` —— 工作区里
+          # ⚠️ 只 add 这两个路径。绝不用 `git add -A` / `git add .` —— 工作区里
           # 躺着明文密钥文件 Key（虽然被 .gitignore 挡住）。这是安全边界，不是风格偏好。
-          git add pushed_history.json
+          # 也不要用 `git add docs/*.md` 这种通配符：GH 的 run 是 bash -e，
+          # 没有 nullglob，无匹配时会把字面量原样传给 git，job 直接死。
+          git add -- pushed_history.json docs
 
-          # 断言：暂存区里必须恰好是这一个路径。多出任何一个都硬失败 ——
-          # 与其把不该提交的东西推上去，不如让 job 变红让人来看。
-          staged="$(git diff --staged --name-only)"
-          if [ "$staged" != "pushed_history.json" ]; then
-            echo "::error::暂存区内容异常，只应包含 pushed_history.json，实际为："
-            echo "$staged"
+          # ⚠️ 早退判断必须在 git add **之后**。原来写的是
+          # `git diff --quiet -- pushed_history.json`，那会在台账没变时跳过整个提交，
+          # 把站点一起漏掉。另一层原因：**未暂存的改动会让下面的 git rebase 直接失败**
+          # （"cannot rebase: You have unstaged changes"），重试 3 次全挂 ——
+          # 所以暂存集合必须等于被修改集合。
+          if git diff --staged --quiet; then
+            echo "台账与站点均无变化（本期没有新增条目），跳过提交"
+            exit 0
+          fi
+
+          # 断言：暂存区里只允许出现枚举出来的这几个路径。
+          # ⚠️ 文件名锁成 YYYY-MM-DD，不要写成 `[^/]+` —— `[^/]+` 会放过 `docs/.md`
+          # 这种空名。枚举实际会生成的名字，比描述"允许的形状"稳。
+          # ⚠️ 大小写严格：CI 是 Linux、大小写敏感，`docs/X.MD` 匹配不上就该红。
+          # 这是**正确的失败方向**，别为了"宽容"改成 (md|MD)。
+          # 路径穿越不需要额外防：`git diff --staged --name-only` 打印的是 git 规范化后的
+          # 仓库相对路径，`git add docs/../Key` 暂存的是 `Key`、打印出来也是 `Key`，匹配不上。
+          # --no-renames：不加的话重命名会打印新旧两个路径，行为随 git 版本漂移。
+          allowed='^(pushed_history\.json|docs/index\.html|docs/[0-9]{4}-[0-9]{2}-[0-9]{2}\.(md|html))$'
+          if git diff --staged --name-only --no-renames | grep -vE "$allowed" | grep -q .; then
+            echo "::error::暂存区出现白名单外的路径："
+            git diff --staged --name-only
             exit 1
           fi
 
-          git commit -m "chore: update pushed_history.json [skip ci]"
+          git commit -m "chore: update pushed_history.json and site [skip ci]"
 
           # 竞态：定时任务与手动触发可能撞上，期间远端可能已有新提交。
           # rebase 后再推，失败退避重试 3 次。
