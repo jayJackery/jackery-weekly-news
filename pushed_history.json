@@ -141,6 +141,101 @@
         "https://finance.yahoo.com/energy/articles/lg-energy-solutions-battery-energy-180000357.html"
       ],
       "pushed": "2026-10-05"
+    },
+    {
+      "title": "Anker SOLIX —— S5000 将 5kWh 级便携电源做成双电压滚轮式家庭备电设备",
+      "urls": [
+        "https://the-gadgeteer.com/2026/10/09/anker-solix-s5000-brings-240v-power-to-a-5kwh-home-backup-battery/",
+        "https://www.commercialappeal.com/press-release/story/168518/anker-introduces-the-anker-solix-s5000-the-longest-lasting-5kwh-portable-power-station/"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "Anker SOLIX —— Solarbank 4 E5000 Pro 将阳台储能单机容量提升至 5kWh",
+      "urls": [
+        "https://www.ankersolix.com/uk/products/ae103",
+        "https://www.infranken.de/ratgeber/verbraucher/schnaeppchen/anker-solarbank-4-pro-mehr-speicher-mehr-ausbaureserve-art-6350911"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "EcoFlow —— STREAM 5000 以电池、逆变器和 MPPT 一体化切入阳台储能",
+      "urls": [
+        "https://www.blackpoolgazette.co.uk/sponsored/ecoflow-stream-5000-home-battery-solar-energy-storage-9086825",
+        "https://www.express.de/shoppingwelt/balkonkraftwerk-speicher-ecoflow-stream-5000-yuma-koeln-1391125",
+        "https://www.infranken.de/ratgeber/verbraucher/schnaeppchen/ecoflow-stream-5000-neue-speicher-serie-fuer-balkonkraftwerke-art-6370860"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "Hoymiles —— HiBattery 4020X 的窗口内更新仍停留在产品评价层面",
+      "urls": [
+        "https://www.hoymiles.com/newsroom.html"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "Marstek —— Venus E 4.0 披露 5kWh 插电式电池的完整结构参数",
+      "urls": [
+        "https://www.pv-magazine.com/2026/10/01/a-closer-look-at-marsteks-5-kwh-plug-in-battery/"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "Goal Zero —— Yeti 1500 作为新一代户外电源继续强化防水与耐候结构",
+      "urls": [
+        "https://goalzero.com/collections/portable-power-stations"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "Zendure —— SolarFlow 2400 AC+ 延续 AC 耦合与模块化扩容路线",
+      "urls": [
+        "https://zendure.com/"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "Mova Tech —— LumeGret A4000 以 4kWh 被动散热户用电池进入阳台储能邻近市场",
+      "urls": [
+        "https://www.pv-magazine.com/2026/10/09/mova-tech-launches-4-kwh-residential-battery-with-ai-based-energy-management/"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "Swelect Energy Systems —— Swess EN+ 将光伏、储能与电网接入合并为可扩展 C&I 混合系统",
+      "urls": [
+        "https://www.pv-magazine.com/2026/09/28/swelect-launches-hybrid-solar-inverter-range-for-ci-applications/"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "Hithium —— 785Ah 钠离子电芯与 4MWh 系统进入工程验证阶段",
+      "urls": [
+        "https://www.pv-magazine.com/2026/10/07/hithiums-sodium-ion-storage-push-where-it-could-win-where-it-wont-and-path-to-bankability/"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "AuroraCell —— NCO 钠离子户用电池以低压大容量和宽温工作窗口切入住宅储能",
+      "urls": [
+        "https://www.pv-magazine.com/2026/10/07/auroracell-launches-9-7-kwh-sodium-ion-chromium-oxide-residential-battery/"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "Macsen Energy —— Prussian white 钠离子电芯披露 150mAh/g 级正极容量与循环数据",
+      "urls": [
+        "https://www.ess-news.com/2026/10/06/indian-startup-claims-over-1500-cycles-for-sodium-ion-cell-with-prussian-white-cathode/"
+      ],
+      "pushed": "2026-10-10"
+    },
+    {
+      "title": "Revolta AG —— 面向无光伏住宅的并网钠离子电池进入研发资助阶段",
+      "urls": [
+        "https://www.pv-magazine.com/2026/10/02/german-startup-wins-grant-for-grid-charging-sodium-ion-home-battery/"
+      ],
+      "pushed": "2026-10-10"
     }
   ]
 }
