@@ -1608,6 +1608,28 @@ footer {
 .toc .toc-t2 { font-size: 14.5px; color: var(--fg); }
 .toc .tc { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 
+/* ---------------- 左侧固定目录（宽屏） ----------------
+   宽屏时把目录从正文顶部挪到左边固定住，读到哪儿都能直接跳到别的章节。
+   窄屏放不下侧栏，退回正文顶部那一份 —— 两份目录在 DOM 里都在，靠媒体查询
+   保证任何宽度下**只有一份可见**。纯 CSS，不依赖 JS。
+
+   侧栏只能放在 `.view-rich` 里：文字版的锚点前缀是 `p-`，侧栏若在视图外面、
+   链接却写 `#sec-N`，切到文字版就成了点了没反应的死链。放在里面则随视图一起
+   显隐 —— 这正是想要的。 */
+.toc-side { display: none; }
+@media (min-width: 1320px) {
+  .toc-side {
+    display: block; position: fixed; z-index: 5;
+    top: 24px; left: max(16px, calc(50% - 636px));
+    width: 216px; max-height: calc(100vh - 48px);
+    overflow-y: auto; margin-bottom: 0;
+  }
+  .toc-inline { display: none; }
+}
+/* 点目录跳过去之后，给落地的那一节一个可见的边 —— 否则读者不知道自己跳到了哪儿。 */
+section.card:target { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+
 /* ---------------- 板块卡片 ---------------- */
 section[id] { scroll-margin-top: 16px; }
 .card {
@@ -2310,9 +2332,16 @@ def render_rich(md: str, date_str: str) -> str:
             f'<span class="tc">{_inline(item["count"])}</span></a></li>'
             for item in parsed
         )
-        toc = f'<div class="toc"><div class="toc-t">本期目录</div><ul>{rows}</ul></div>'
+        # 同一份目录渲染两遍：宽屏显示左边固定那份（.toc-side），窄屏显示正文顶部
+        # 那份（.toc-inline），媒体查询保证任何宽度下只有一份可见。
+        # ⚠️ `.toc-side` 是 `position: fixed`，DOM 里放最前面不会占位。
+        # ⚠️ 目录本身不带 id，重复渲染**不会**撞 id（本节开头那条重复 id 的忌讳
+        # 说的是 `sec-N` / `p-N` 这类锚点，不是这里）。
+        listing = f'<div class="toc-t">本期目录</div><ul>{rows}</ul>'
+        toc_side = f'<aside class="toc toc-side" aria-label="本期目录">{listing}</aside>'
+        toc_inline = f'<div class="toc toc-inline">{listing}</div>'
     else:
-        toc = ""
+        toc_side = toc_inline = ""
 
     cards: list[str] = []
     for item in parsed:
@@ -2342,7 +2371,8 @@ def render_rich(md: str, date_str: str) -> str:
 
     return (
         _rich_hero(_report_title(md), preamble, date_str, total)
-        + toc
+        + toc_side
+        + toc_inline
         + "".join(cards)
     )
 

@@ -2,8 +2,10 @@ name: Weekly Industry News
 
 on:
   schedule:
-    # cron 用的是 UTC。UTC 周一 01:00 = 北京时间周一 09:00（中国无夏令时）。
-    - cron: '0 1 * * 1'
+    # cron 用的是 UTC。UTC 周一 01:30 = 北京时间周一 09:30（中国无夏令时）。
+    # ⚠️ 改这个时间要同步改三处：这里、README 的「定时任务」表、CLAUDE.md 的
+    # 「项目是什么」与「已知陷阱 → GitHub Actions」。漏改不会报错，只会让文档骗人。
+    - cron: '30 1 * * 1'
   workflow_dispatch:        # 手动触发（Run workflow 按钮）
 
 # ⚠️ 一旦声明 permissions，未列出的 scope 全部变 none。这里要写仓库是因为

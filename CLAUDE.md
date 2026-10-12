@@ -6,7 +6,7 @@
 
 华宝新能（Jackery）**储能结构工程师**的每周行业情报自动推送。
 
-每周一北京时间 09:00，GitHub Actions 运行 `main.py`：经 **OpenRouter** 调用
+每周一北京时间 **09:30**，GitHub Actions 运行 `main.py`：经 **OpenRouter** 调用
 `perplexity/sonar-pro-search` 联网检索近 **14** 天全球储能硬件工程动态 →
 撰写成五个板块的 Markdown 周报 → **发布到 GitHub Pages 网页** → 往钉钉群推一条
 **摘要 + 链接** → 把本期条目的链接回写台账并提交。
@@ -191,9 +191,11 @@ python main.py                        # 完整流程
   **IP 白名单模式不可用**，只能用自定义关键词或加签。本项目用关键词。
 
 **GitHub Actions**
-- cron 是 **UTC**。`0 1 * * 1` = 北京周一 09:00。
+- cron 是 **UTC**。`30 1 * * 1` = 北京周一 **09:30**（2026-10-12 从 `0 1` 挪过来的）。
+  ⚠️ 改推送时间要同步改三处：`weekly.yml` 的 cron、README「定时任务」表、本文件。
   ⚠️ 旧版写的是 `0 1 * * 0` —— **`0` 是周日，实际会在北京周日 09:00 触发**，
   而当时的 README 和 CLAUDE.md 都误写成"周一"。改成 `1` 才是真的周一。
+  日位比分钟位更容易写错，也更容易被忽略 —— **改完用 <https://crontab.guru> 核一遍**。
 - `actions/setup-python@v7` **移除了 `pip-install` input**，依赖用独立的 `pip install` 步骤。
 - 整点是 GitHub Actions 的高负载时段，定时任务可能被延迟或丢弃。若推送时间不稳定，
   把 cron 分钟位从 `0` 改成 `7`。
@@ -410,6 +412,18 @@ python main.py                        # 完整流程
   `.wrap` 里的 radio 够不到 `:root` 变量，而 `body` 自己的背景只认 `:root` 的值，
   纯 CSS 会得到"卡片变了、页面背景没变"的半吊子结果。没 JS 时按钮保持 `hidden`、
   页面跟随系统，这是刻意的降级。
+- ⚠️ **左侧固定目录是"同一份目录渲染两遍"，靠媒体查询保证只有一份可见。**
+  宽屏（`min-width: 1320px`）显示 `.toc-side`（`position: fixed`），窄屏显示
+  `.toc-inline`（正文顶部，即原来的样子）。两份都不带 id，所以**不违反上面那条
+  重复 id 的忌讳** —— 那条说的是 `sec-N` / `p-N` 锚点，不是目录本身。
+  - **侧栏必须放在 `.view-rich` 内部**，不能放到视图外面：文字版的锚点前缀是 `p-`，
+    侧栏链接写死 `#sec-N`，放到外面切到文字版就成了点了没反应的死链。放在里面则随
+    视图一起显隐，这正是想要的。
+  - ⚠️ **`left: max(16px, calc(50% - 636px))` 里的 `636` 是从 `.wrap` 的
+    `max-width: 820px` + `padding: 0 20px` 算出来的**（`410 + 20 + 30 间距 + 216 宽`）。
+    **改 `.wrap` 宽度或侧栏宽度，必须同步改这个数**，否则侧栏会压住正文或飘出屏幕。
+    这个耦合没有任何机制保证，只能靠这条注释。
+  - 窄屏退回正文顶部那份是**必须的**：直接隐藏侧栏会让手机读者彻底失去目录。
 - ⚠️ **色彩主题的 CSS 优先级陷阱**：`@media` 里的 `:root:not([data-theme])` 和
   `:root[data-theme="dark"]` 都是 (0,2,0)，**源码顺序决定优先级** —— 所以显式主题的
   样式块必须放在媒体查询**之后**。
@@ -457,6 +471,7 @@ python main.py                        # 完整流程
 | 改多消息间隔 | `MESSAGE_INTERVAL`（**别低于 3 秒，20 条/分钟超限封 10 分钟**） |
 | 改推送时间 | `.github/workflows/weekly.yml` 的 cron（**记得算 UTC**） |
 | 改网页样式 / 配色 / 排版 | `main.py` 的 `_PAGE_CSS`（**内联进 HTML，注释里不能出现 `</style>`**）；改完用 `python main.py --rebuild` 立刻看效果，不花额度 |
+| 改左侧固定目录（断点 / 宽度 / 位置） | `_PAGE_CSS` 的 `.toc-side` 那一段 + `render_rich()` 里生成 `toc_side` 的那几行。⚠️ **`left` 里的 `636` 是从 `.wrap` 宽度算出来的，改宽度要一起改**，见「已知陷阱 → 网页与站点」 |
 | 改网页主题切换逻辑 | `main.py` 的 `_THEME_SCRIPT`（**纯 ES5、静态字面量、内联在 `<head>`**；注意注释里不能出现 `</script>`） |
 | 改站点地址 / 开关网页功能 | 环境变量 `SITE_BASE_URL`（**不设 = 用 `DEFAULT_SITE_BASE_URL`；`off` = 关闭并退回推全文**。⚠️ **留空串 ≠ 关闭**，`load_config()` 把空串当"用默认值"，所以 workflow 里那个 `${{ vars.SITE_BASE_URL }}` 没配也不会静默失效。真要关必须显式写 `off`） |
 | 改摘要取哪几条 | `build_digest()` / `_digest_titles()` / `_digest_regions()`（⚠️ **五个板块形态不一样，不能用一套规则套** —— 板块四没有 `### `、板块五整节是散文，见该函数的 docstring） |
