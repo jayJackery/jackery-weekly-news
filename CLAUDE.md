@@ -63,7 +63,8 @@ Pages 重建（30~60 秒）→ 群里那条链接才真正可用
 `main.py` 内部分区（按文件顺序）：配置常量 → 促销词表 → **跨周台账** → 提示词 →
 环境变量校验 → OpenRouter 调用 → 正文校验与组装（含三个过滤器）→ 消息分段 →
 **网页渲染**（`markdown_to_html` / `render_rich` / `render_issue_page` / `build_site`）→
-**摘要抽取**（`build_digest`）→ 钉钉推送 → `main()` 主流程。
+**摘要抽取**（`build_digest`）→ 钉钉推送 → **失败告警**（`build_failure_alert` /
+`alert_failure`，只在 `--alert-failure` 下走）→ `main()` 主流程。
 
 ## 常用命令
 
@@ -74,6 +75,8 @@ python main.py --dry-run              # 打印摘要 + 全文，不推送、不�
 python main.py --dry-run --out r.md   # 顺便存 r.md 和 r.html，后者用浏览器看网页排版
 python main.py --rebuild              # 只从 docs/*.md 重建站点，不调 API、不推送、不写台账
 python main.py                        # 完整流程
+python main.py --alert-failure        # 失败告警（workflow 失败时由 CI 调）。⚠️ 会真发钉钉，
+                                      # 除非 DINGTALK_WEBHOOK 没配或故意填一个无效 token
 ```
 
 看 Actions 日志：仓库页面 → Actions → Weekly Industry News → 选一次运行。
@@ -136,6 +139,14 @@ python main.py                        # 完整流程
       / `git add .` —— `Key` 就躺在工作区里（虽被 gitignore 挡住），这是安全边界。
       也别用 `git add docs/*.md` 这种通配符：GH 的 `run` 是 `bash -e`，没有 `nullglob`，
       无匹配时会把字面量原样传给 git，job 直接死。
+12. **失败告警这条路必须保持"零副作用 + 不依赖配置"。** 三条一起看：
+    ① `weekly.yml` 的告警步骤是 `if: failure()`，**它不写任何文件、不 commit、不碰台账**；
+    ② `alert_failure()` **刻意绕开 `load_config()`**，只认 `DINGTALK_WEBHOOK` 一个变量
+    （失败原因本身可能就是密钥没配好，走 `load_config()` 会在发告警之前先退出）；
+    ③ `--alert-failure` 的分支在 `main()` 里必须排在 `load_config()` **和 `--rebuild`
+    之前**。⚠️ **不要为了"统一"把它并进主流程或让它读别的配置** —— 那样最容易告警的
+    那次失败，恰恰就是告警发不出去的那次（静默失败，正是这个项目最怕的形态）。
+    详见「已知陷阱 → 失败告警与余额预警」。
 
 ## 已知陷阱（踩过的坑，别再踩一遍）
 
@@ -189,6 +200,17 @@ python main.py                        # 完整流程
 - **HTTP 200 不代表成功**，必须检查 `errcode == 0`（值可能是字符串 `"0"`，用 `int()` 转）。
 - GitHub 托管 runner 出口 IP 不固定（`api.github.com/meta` 有 7000+ 个 CIDR 段），
   **IP 白名单模式不可用**，只能用自定义关键词或加签。本项目用关键词。
+- **token 无效的实测错误码是 `300005 token is not exist`**（2026-10-12 实测；不是
+  常被猜的 `300001`）。
+- ⚠️ **实测到过一次会带偏排查方向的回包**：同一次失败里，第一次回的是
+  `300005 token is not exist`，而重试中的某一次回了 `660026 sending too many messages
+  per minute`。旧的 `send_dingtalk` 只把**最后一次**异常往外抛，于是日志上写的是
+  "发太频了"，真正的原因（token 根本不对）被盖掉了 —— 在**告警**这条路上尤其致命，
+  它本来就是用来报错的。已改成收集全部不重复的原因一起抛（`钉钉推送持续失败：A ；B`）。
+  **不要改回只留 `last_exc`。**
+- ⚠️ **`660026` 只实测出现过，成因没定论**：它看着像"每分钟条数"限流，但同样用无效
+  token、间隔 2 秒连打三次又全是 `300005`。所以**不要**据此把它加进"不重试"的分支
+  （现有不重试的只有 `410100`，那是另一码事）。真要动，先拿到一个可复现的用例。
 
 **GitHub Actions**
 - cron 是 **UTC**。`30 1 * * 1` = 北京周一 **09:30**（2026-10-12 从 `0 1` 挪过来的）。
@@ -213,6 +235,10 @@ python main.py                        # 完整流程
   见硬性约束 11 —— 那里写了它防的是什么、以及为什么不能放宽。
 - **`cancel-in-progress` 必须是 `false`。** 设成 `true` 会在"消息已发出、台账还没提交"
   的窗口里取消这次运行，那一期的记录就丢了。
+- **失败告警那一步是 `if: failure()`，和上面被禁止的 `if: always()` 不是一回事** ——
+  `always()` 会让失败的运行也走到**提交**那一步（污染台账），而告警步骤**一个文件都不写、
+  不 commit、不走 `load_config()`**。⚠️ **不要因为"都是条件执行"就把两者合并理解**，
+  更不要给提交步骤加上 `if: failure()` / `if: always()`。见「已知陷阱 → 失败告警与余额预警」。
 - `actions/checkout` 要带 `fetch-depth: 0` —— 提交步骤要 rebase 到远端，浅克隆下不可靠。
 - **`pushed_history.json` 必须先在仓库里存在**（哪怕只有 `{"version": 1, "entries": []}`）。
   否则 `git add pushed_history.json` 会以非 0 退出，workflow 每周变红。
@@ -221,6 +247,54 @@ python main.py                        # 完整流程
   ⚠️ `weekly.yml` 曾长期**未被 git 跟踪**（`?? .github/`）。用 `git commit -a` 提交时
   **不会带上它**，仓库里会出现"一个 workflow 都没有"的状态 —— 机器人静默永不运行，
   这是最长时间无人察觉的失败模式。改动 workflow 后务必确认它进了提交。
+
+**失败告警与余额预警（2026-10-12 加的）**
+- **为什么加**：这个项目最主要的失败形态是**静默地不推送** —— 定时任务被 GitHub 丢弃、
+  密钥过期、余额耗尽，表现全都是"群里这周没消息"，而**没有任何人会收到通知**。
+  `fail-loudly` 只保证 Actions 变红，而变红的 job 不会自己告诉任何人。告警把"没消息"
+  变成一条主动发出来的消息。
+- **告警走 `--alert-failure` 这个独立入口，刻意绕开 `load_config()`。** 理由是本项目最
+  需要告警的那次失败，恰恰是密钥没配好/失效的那次 —— 而 `load_config()` 遇到缺变量就是
+  `sys.exit`，会把告警一起带走。所以 `alert_failure()` 只认 `DINGTALK_WEBHOOK`。
+  ⚠️ **这个分支在 `main()` 里必须排在 `load_config()` 和 `--rebuild` 之前。**
+- ⚠️ **`if: failure()` ≠ 被明令禁止的 `if: always()`。** 后者禁止的是**提交步骤**加了它
+  （会把没送达读者的条目标成已推送）。告警步骤写 `if: failure()` 是安全的：它不写文件、
+  不 commit、不碰台账。**两者不要混为一谈，也不要顺手给提交步骤加任何条件。**
+- **步骤 id ↔ `_STEP_LABELS` 是人工维护的一对。** `weekly.yml` 里每个 step 的 `id:` 和
+  `main.py` 的 `_STEP_LABELS` 要一起改。⚠️ **刻意不做成"两边不一致就报错"** ——
+  告警本身不该有失败的可能，所以 `_STEP_LABELS.get(id, id)` 会退化成打印裸 id。
+  加步骤时只给 `id` 不登记，不会报错，只是告警里少一句人话。
+- ⚠️ **告警步骤里那句 `python -c "import requests" || pip install ...` 不要删。**
+  它防的是一个具体的死法：若挂的正是 `安装依赖` 那一步，setup-python 装出来的解释器里
+  没有 `requests`，而 `main.py` 在 import 阶段就会 `sys.exit` —— 于是最该被通知的那次
+  失败反而通知不出去。已经装好时它只是一次原地检查。
+- **已知覆盖不到**：`拉取代码` / `安装 Python` 失败时，runner 上既没有仓库也没有解释器，
+  发不出告警。这两步几乎不会失败，且 GitHub 对失败的定时任务本来就会给管理员发邮件，
+  所以**没有再为它加一套 bash + curl 的发送路径**（那是重复实现）。
+- **余额预警用 `/credits`（账户级 `total_credits - total_usage`），不要改用
+  `/auth/key` 的 `limit_remaining`。** 后者是这把 key 的**消费上限**，跟账户里有多少钱
+  是两回事 —— 实测该 key 的 `limit_remaining` 是 **46.35**，而账户真实余额只有 **1.35**。
+  用错字段会得到一个"永远很充裕"的假象，预警等于没有。`/api/v1/activity` 需要
+  **管理 key**，这把 key 会 403，别去试。
+- ⚠️ **`check_openrouter_balance()` 永不抛异常，是本项目里唯一刻意不 fail-loudly 的地方。**
+  余额接口挂了 / 限流 / 字段改名，都只打一条 WARNING 然后返回 `None`，**绝不中断推送** ——
+  它是附加信息，不该对这一期有否决权。同理 `_low_balance_note(None)` 返回空串。
+  **不要为了"统一风格"把它改成抛异常。**
+- **提醒阈值是"估算剩余期数 ≤ 1"，不是美元数**，算式与那句"约合 N 期"共用
+  （`OPENROUTER_LOW_RUNS_LEFT` / `OPENROUTER_COST_PER_RUN_USD`）。使用者明确要求
+  **"仅剩一期的时候再报错"** —— 每周一句"余额不多"会变成背景噪声。
+  代价是只有一期的提前量，兜底就是上面那条失败告警。⚠️ `OPENROUTER_COST_PER_RUN_USD`
+  同时决定提醒的**早晚**：它偏大 → 期数偏少 → 提醒偏早。失准时宁可偏大。
+- **余额提醒只加在 `base_url` 那条路径上**（网页模式）。退回落后的"推全文（分段）"路径时
+  **不附**：`split_markdown()` 已经把每条切到 `MAX_MESSAGE_BYTES`，追加一句会让最后一条
+  悄悄超出上限。别为了"两条路径一致"把它补上去。
+- **余额查询放在 `main()` 里，不在 `build_digest()` 里** —— `build_digest` 是纯函数
+  （只吃 `report`），让它发网络请求就没法单独测、也没法在不联网时复现同一份摘要。
+  它在 `--dry-run` 下也会执行（**这是有意的**：dry-run 的目的就是让使用者看到群里
+  到底会收到什么，包括那句提醒）。它只读，不花 token。
+- 本地验证告警文案不用连网：`build_failure_alert()` 只读环境变量，
+  `GITHUB_*` / `STEP_*` 都能手工造。⚠️ **别拿真 webhook 试** —— 那会往群里发一条假的
+  "推送失败"；用一个 token 无效的地址即可走完 HTTP + 错误处理且什么都不发出。
 
 **促销稿混进竞品动态（踩过两次，第二次是 OpenRouter 方案下的）**
 - **症状**：板块一里出现"XX 厂商 —— 进入上市促销 / 限时优惠"，容量和价格都是真数字，
@@ -467,6 +541,11 @@ python main.py                        # 完整流程
 | 改检索时间窗 | `WINDOW_DAYS` + `_window()` + **六处 `近 N 天` 措辞**（**没有 API 层开关**，见上文陷阱） |
 | 改跨周去重规则 | `HISTORY_KEEP_DAYS` / `TRACKING_QUERY_KEYS` / `INDEX_PATH_SEGMENTS` / `drop_repeat_blocks`（**四个守卫一个都不能少，见硬性约束 9**） |
 | 台账崩了 / 想手工重置 | `pushed_history.json`（**正常不要手改**；`version` 不符或 JSON 坏掉会非 0 退出，这是刻意的） |
+| 改余额提醒何时出现 / 那句话 | `OPENROUTER_LOW_RUNS_LEFT` + `OPENROUTER_COST_PER_RUN_USD` + `_low_balance_note()`。⚠️ 阈值是**估算剩余期数**，不是美元数；成本常量同时决定提醒早晚，失准宁可偏大 |
+| 改余额是怎么查出来的 | `check_openrouter_balance()`。⚠️ 必须用 `/credits` 的账户余额，**不要换成 `/auth/key` 的 `limit_remaining`**（那是 key 的消费上限，实测 46.35 vs 真实 1.35） |
+| 改失败告警的文案 | `build_failure_alert()`；步骤的显示名在它上面的 `_STEP_LABELS` |
+| 加 / 删 / 重命名工作流步骤 | `.github/workflows/weekly.yml`。⚠️ **新步骤要给 `id:`，并在 `_STEP_LABELS` 里登记**（漏登记不报错，告警里只会印裸 id）。⚠️ **不要动提交步骤，也不要给它加任何 `if:`** |
+| 想彻底关掉失败告警 | 删掉 `weekly.yml` 最后那个 `Alert - 失败时往钉钉发告警` 步骤（连同 `id:` 与 `STEP_*` 环境变量）。⚠️ **别改成 `if: always()`**，那和提交步骤被禁的是同一件事 |
 | 改单条消息字节上限 | `MAX_MESSAGE_BYTES`（**注意 `plan_messages` 会预留前缀字节**） |
 | 改多消息间隔 | `MESSAGE_INTERVAL`（**别低于 3 秒，20 条/分钟超限封 10 分钟**） |
 | 改推送时间 | `.github/workflows/weekly.yml` 的 cron（**记得算 UTC**） |

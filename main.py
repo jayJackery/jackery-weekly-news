@@ -17,6 +17,8 @@ OpenRouter 上的 sonar 系列本身就会联网检索，检索与撰写在一�
     python main.py                # 完整流程
     python main.py --dry-run      # 只打印 Markdown，不推送钉钉
     python main.py --out r.md     # 额外把原文存成文件，便于先审阅再发
+    python main.py --rebuild      # 只从 docs/*.md 重建站点
+    python main.py --alert-failure  # 失败告警，由 workflow 在任一步失败时调用
 
 环境变量见 README.md。任何异常都会以非 0 退出码结束，以便 GitHub Actions 变红告警。
 """
@@ -125,6 +127,20 @@ OPENROUTER_TITLE = "Storage Weekly Bot"
 OPENROUTER_TIMEOUT = 300        # 秒；联网检索 + 长文撰写，给足时间
 OPENROUTER_RETRIES = 2
 OPENROUTER_BACKOFF = 8          # 秒
+
+# 余额预警：估算"还够推几期"，**剩到 1 期或更少**才在摘要末尾附一句提醒。
+# 阈值定得这么低是刻意的（使用者明确要过"仅剩一期的时候再报错"）：更早的提醒是噪声，
+# 每周都看到一句"余额不多"很快就会当成背景噪声无视掉，不如只在真要断的时候说一次。
+# 代价是只有一期的提前量 —— 兜底是**失败告警**：余额真耗尽时那次运行会 402 退出，
+# 告警会主动发到群里，不会静默停摆。
+OPENROUTER_LOW_RUNS_LEFT = 1
+# 单期成本的实测值，**唯一用途是把余额换算成"还够推几期"** —— 它同时决定那句提醒
+# 什么时候出现：这个数偏大 → 估出的期数偏少 → 提醒来得偏早。所以万一它失准，
+# 宁可略偏大（早提醒一句无害，晚提醒会真的断在某一周）。
+# 2026-10-12 实测：当日 3 次运行共 $0.79961 → 每期 ≈ $0.2665；
+# 用月度数据交叉核对（$1.30217 / 5 次）结果一致。改用例、换模型、调 WINDOW_DAYS
+# 都会让它失准。失准的后果只是提醒早晚差一期，不会让任何东西失败。
+OPENROUTER_COST_PER_RUN_USD = 0.27
 
 # 单条钉钉消息正文的 UTF-8 字节上限。
 # 官方对自定义机器人 markdown 正文长度没有任何明文规定（流传的 20000 字节查无出处），
@@ -910,6 +926,56 @@ def load_config(dry_run: bool) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # OpenRouter 调用
 # ---------------------------------------------------------------------------
+
+def check_openrouter_balance(api_key: str) -> float | None:
+    """查 OpenRouter 账户余额（美元）。**任何失败都返回 None，绝不抛异常。**
+
+    ⚠️ 这是"附加信息"，不是主流程的一部分：余额接口挂了、限流了、返回体改形状了，
+    都不该让这一期的推送失败。所以这里全部吞掉、只打 WARNING —— 本项目别处都讲究
+    fail-loudly，**这一处是刻意的例外**，理由正是它不该对这一期有否决权。
+
+    ⚠️ 用 `/credits`（账户级：`total_credits - total_usage`），**不要改用
+    `/auth/key` 的 `limit_remaining`** —— 后者是这把 key 的**消费上限**，跟账户里
+    还有多少钱是两回事。实测该 key 的 limit_remaining 是 46.35，而账户真实余额
+    只剩 1.35。拿它当余额会得到一个"永远很充裕"的假象，预警等于没有。
+    """
+    if not api_key:
+        return None
+    try:
+        response = requests.get(
+            f"{OPENROUTER_BASE_URL}/credits",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=20,
+        )
+        if response.status_code != 200:
+            LOG.warning("余额查询返回 HTTP %s，本期不附余额提醒", response.status_code)
+            return None
+        data = response.json().get("data") or {}
+        return float(data["total_credits"]) - float(data["total_usage"])
+    except Exception as exc:  # noqa: BLE001
+        # 刻意宽口径捕获：这里能出错的方式太多（网络、JSON、字段改名、类型变了），
+        # 逐个列举只会漏。反正无论哪种都不该影响推送。
+        LOG.warning("余额查询失败（%s: %s），本期不附余额提醒", type(exc).__name__, exc)
+        return None
+
+
+def _low_balance_note(balance: float | None) -> str:
+    """余额够用就返回空串，**只剩一期或更少**时返回要附在摘要末尾的那一句。
+
+    ⚠️ 判断走的是"估算期数 ≤ OPENROUTER_LOW_RUNS_LEFT"，不是直接比美元数 ——
+    这样阈值和那句"约合 N 期"用的是同一个算式，不会出现"提醒里写着还剩 2 期，
+    提醒却在只剩 1 期时才出现"这种自相矛盾。
+    """
+    if balance is None:
+        return ""
+    runs = max(0, int(balance / OPENROUTER_COST_PER_RUN_USD))
+    if runs > OPENROUTER_LOW_RUNS_LEFT:
+        return ""
+    if runs == 0:
+        # 已经不够跑一次了。这一期之所以还能发出去，是因为余额是在**推送之后**查的。
+        return f"\n\n⚠️ OpenRouter 余额仅剩 ${balance:.2f}，已不足一次运行，请立即充值。"
+    return f"\n\n⚠️ OpenRouter 余额仅剩 ${balance:.2f}，约合 {runs} 期，请及时充值。"
+
 
 def extract_citations(data: dict, message: dict) -> list[str]:
     """尽力从响应里取回引用链接。
@@ -2684,7 +2750,13 @@ def send_dingtalk(webhook: str, title: str, text: str) -> None:
         "at": {"isAtAll": False},
     }
 
-    last_exc: Exception | None = None
+    # ⚠️ 收集**所有**失败原因，不是只留最后一个。动机是一次实测：拿一个无效 token
+    # 跑重试，第一次回的是 `300005 token is not exist`，而**重试中的某一次**回的是
+    # `660026 sending too many messages per minute`。只报最后一个的话，日志上写的是
+    # "发太频了"，真正的原因（token 根本不对）被盖掉，排查方向彻底带偏 ——
+    # 在**告警**这条路上尤其致命，因为它本来就是用来报错的。
+    # （660026 只在那一轮里出现过，重复试验没能复现，所以别把它当成"重试必然如此"。）
+    seen: list[str] = []
     for attempt in range(1, DINGTALK_RETRIES + 2):
         try:
             response = requests.post(webhook, json=payload, timeout=20)
@@ -2714,13 +2786,99 @@ def send_dingtalk(webhook: str, title: str, text: str) -> None:
         except SystemExit:
             raise
         except Exception as exc:  # noqa: BLE001
-            last_exc = exc
+            note = f"{type(exc).__name__}: {exc}"
+            if note not in seen:
+                seen.append(note)
             LOG.warning("钉钉推送失败（第 %d/%d 次）：%s",
                         attempt, DINGTALK_RETRIES + 1, exc)
             if attempt <= DINGTALK_RETRIES:
                 time.sleep(DINGTALK_BACKOFF * attempt)
 
-    raise RuntimeError(f"钉钉推送持续失败：{type(last_exc).__name__}: {last_exc}")
+    raise RuntimeError("钉钉推送持续失败：" + " ；".join(seen))
+
+
+# ---------------------------------------------------------------------------
+# 失败告警
+# ---------------------------------------------------------------------------
+# 由 workflow 在**任一步失败**时调用（`if: failure()` → `python main.py --alert-failure`）。
+# 为什么要有它：这个项目的主要失败模式是"静默地不推送"—— 定时任务被 GitHub 丢弃、
+# 密钥过期、余额耗尽，表现都是"群里这周没消息"，而没人会为此收到任何通知。
+# 告警把"没消息"变成一个主动发出来的消息。
+#
+# ⚠️ 它和提交步骤的 `if: always()` 是两回事，别混为一谈（后者被明令禁止，理由见
+# weekly.yml 里那段注释：会在推送失败时也提交台账，把没送达读者的条目永久标记成已推送）。
+# 这一步**不写任何文件、不碰台账、不 commit**，只发一条消息。
+
+# workflow 里每个 step 的 id → 人话。**改 weekly.yml 的步骤时要同步改这里。**
+# 漏改不会报错：下面用 `_STEP_LABELS.get(id, id)`，会退化成打印裸 id ——
+# 信息少一点，但仍然指得动。**刻意不做成"两边必须一致否则报错"**：
+# 告警本身不应该有失败的可能。
+_STEP_LABELS = {
+    "checkout": "拉取代码",
+    "python": "安装 Python",
+    "guard": "密钥文件守卫（检查 Key 有没有被误跟踪）",
+    "deps": "安装依赖",
+    "run": "运行 main.py（检索 + 撰写 + 推送）",
+    "commit": "提交台账与站点",
+}
+
+
+def build_failure_alert() -> str:
+    """拼出失败告警的正文。信息全部来自环境变量，不查任何接口、不读 Key。"""
+    # GITHUB_* 是 Actions 默认注入的环境变量；STEP_* 由 workflow 那一步显式传入。
+    # 取不到就留空 —— 告警宁可少一行信息，也不能因为拼字符串而抛异常。
+    failed = [
+        _STEP_LABELS.get(step_id, step_id)
+        for step_id in _STEP_LABELS
+        # 只列真出问题的：成功的不提，**跳过的也不提**（失败之后的下游步骤
+        # outcome 就是 skipped，列出来会让"哪一步挂了"变成一长串噪声）。
+        if (os.environ.get(f"STEP_{step_id.upper()}") or "") not in {"", "success", "skipped"}
+    ]
+
+    sha = (os.environ.get("GITHUB_SHA") or "")[:7]
+    event = os.environ.get("GITHUB_EVENT_NAME") or ""
+    trigger = {"schedule": "定时", "workflow_dispatch": "手动触发"}.get(event, event or "未知")
+    run_url = "{}/{}/actions/runs/{}".format(
+        os.environ.get("GITHUB_SERVER_URL") or "",
+        os.environ.get("GITHUB_REPOSITORY") or "",
+        os.environ.get("GITHUB_RUN_ID") or "",
+    )
+
+    lines = [
+        f"{DINGTALK_KEYWORD} ⚠️ 周报推送失败",
+        "",
+        "**失败于**：" + ("、".join(failed) if failed else "（没能定位到具体步骤，看日志）"),
+        f"时间：{datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M')}（北京）",
+        f"提交：{sha} ｜ 触发：{trigger}",
+    ]
+    if run_url.startswith("http"):
+        lines += ["", f"👉 [查看日志 / 手动重跑]({run_url})"]
+    lines += [
+        "",
+        "台账没提交，所以修好后重跑不会漏内容；"
+        "若群里已经收到过这一期，重跑会再发一遍，忽略即可。",
+    ]
+    return "\n".join(lines)
+
+
+def alert_failure() -> int:
+    """失败告警的入口。**刻意绕开 load_config()。**
+
+    ⚠️ 为什么不能走 load_config()：失败的原因本身可能就是"密钥没配好"或
+    "API Key 失效了"。而 load_config 缺变量就是 sys.exit —— 于是最需要告警的那次
+    失败，恰恰是告警发不出去的那次。所以这里只认 DINGTALK_WEBHOOK 一个变量。
+    """
+    webhook = (os.environ.get("DINGTALK_WEBHOOK") or "").strip()
+    if not webhook.startswith("https://oapi.dingtalk.com/"):
+        # 非 0 退出：job 本来就红了，这里再红一次不增加负担，但 ::error:: 会以
+        # 注解形式出现在 Actions 摘要顶部 —— 明确告诉你"这次连告警都没发出去"。
+        print("::error::失败告警未能发出：DINGTALK_WEBHOOK 未配置或格式不对", file=sys.stderr)
+        return 1
+    text = build_failure_alert()
+    LOG.info("正在发送失败告警")
+    send_dingtalk(webhook, f"{DINGTALK_KEYWORD} 周报推送失败", text)
+    LOG.info("失败告警已送达")
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -2736,6 +2894,9 @@ def main() -> int:
                              "便于推送前审阅")
     parser.add_argument("--rebuild", action="store_true",
                         help="只从 docs/*.md 重建网页，不调 API、不推送、不写台账")
+    parser.add_argument("--alert-failure", action="store_true",
+                        help="只在 workflow 失败时由 CI 调用：往钉钉发一条失败告警。"
+                             "不读 Key、不校验其它配置、不写任何文件")
     args = parser.parse_args()
 
     # Windows 上输出被重定向（管道 / VSCode 集成终端 / Git Bash）时，Python 会按
@@ -2756,6 +2917,11 @@ def main() -> int:
         datefmt="%Y-%m-%d %H:%M:%S",
         stream=sys.stdout,
     )
+
+    # 失败告警：放在**最前面**，连 load_config 都不走。理由见 alert_failure() 的 docstring
+    # —— 最需要告警的那次失败（密钥没配好 / 失效），恰恰是 load_config 会先退出的那次。
+    if args.alert_failure:
+        return alert_failure()
 
     # 只重建站点：改了 CSS 想立刻看效果，不必等周一，也不花 API 额度。
     # 不需要任何环境变量，所以放在 load_config 之前。
@@ -2793,12 +2959,27 @@ def main() -> int:
         ))
         LOG.info("已另存到 %s 与 %s（后者可直接用浏览器打开看排版）", args.out, preview)
 
+    # 余额预警：读一眼账户余额，**只剩一期或更少**就在摘要末尾附一句。
+    # ⚠️ 放在这里而不是 build_digest() 里 —— build_digest 是个纯函数（只吃 report），
+    # 让它去发网络请求，就没法单独测它、也没法在不联网时复现出同一份摘要。
+    # 查不到（None）就什么都不做，绝不因此中断这一期。
+    balance = check_openrouter_balance(cfg["OPENROUTER_API_KEY"]) if base_url else None
+    if balance is not None:
+        # 余额每期都打一行日志（与阈值无关）：出问题时日志是唯一的事后依据，
+        # 而余额是"这周为什么 402 了"最直接的答案。
+        LOG.info("OpenRouter 账户余额 $%.5f，约合 %.1f 期（剩 ≤%d 期时会在摘要里提醒）",
+                 balance, balance / OPENROUTER_COST_PER_RUN_USD, OPENROUTER_LOW_RUNS_LEFT)
+
     if base_url:
         # 新行为：群里只发摘要 + 链接，全文在网页上。
-        messages = [build_digest(report, today, base_url)]
+        # 余额不足时在末尾附一句 —— 摘要在 1KB 出头，加这一句远到不了 8KB 上限。
+        messages = [build_digest(report, today, base_url) + _low_balance_note(balance)]
     else:
         # 退回旧行为：推送全文（分段）。这条路径是 SITE_BASE_URL 为空时的兜底，
         # plan_messages 因此不能删。
+        # ⚠️ 这条路径上**不附**余额提醒：split_markdown 已经把每条切到 MAX_MESSAGE_BYTES，
+        # 追加一句会让最后一条悄悄超出上限。余额提醒是附加信息，不值得为它在兜底路径上
+        # 破掉"单条不超 8KB"这条已有的保证。
         messages = plan_messages(report)
     LOG.info("拆分为 %d 条消息，正文长度 %s 字节",
              len(messages), [len(m.encode("utf-8")) for m in messages])
