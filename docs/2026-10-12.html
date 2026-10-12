@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>[行业资讯] 储能结构周报（2026-10-12）</title>
+<script>
+(function(){
+  var K='weekly-theme', root=document.documentElement;
+  try{
+    var s=localStorage.getItem(K);
+    if(s==='dark'||s==='light')root.setAttribute('data-theme',s);
+  }catch(e){}
+  function wire(){
+    var b=document.getElementById('themebtn');
+    if(!b)return;
+    var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+    function cur(){
+      return root.getAttribute('data-theme')||((mq&&mq.matches)?'dark':'light');
+    }
+    function paint(){b.textContent=(cur()==='dark')?'浅色':'深色';}
+    b.addEventListener('click',function(){
+      var next=(cur()==='dark')?'light':'dark';
+      root.setAttribute('data-theme',next);
+      try{localStorage.setItem(K,next);}catch(e){}
+      paint();
+    });
+    b.hidden=false;
+    paint();
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',wire);
+  }else{
+    wire();
+  }
+})();
+</script>
+<style>
+:root {
+  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
+  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
+  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  color-scheme: light;
+}
+/* 没有显式选择时跟随系统。`:root:not([data-theme])` 与下面的 `:root[data-theme=…]`
+   特异性相同（都是 0,2,0），所以**顺序决定胜负** —— 显式那两条必须在文档里靠后，
+   否则点了按钮不生效。 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
+    --bg:#0d1117; --code:#161b22; --accent:#f0883e;
+    --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
+  --bg:#0d1117; --code:#161b22; --accent:#f0883e;
+  --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
+  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
+  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 820px; margin: 0 auto; padding: 22px 20px 72px; }
+nav.top {
+  display: flex; gap: 12px; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 26px;
+  font-size: 14px;
+}
+nav.top .disabled { color: var(--muted); }
+h1 { font-size: 23px; line-height: 1.45; margin: 0 0 6px; }
+h2 {
+  font-size: 19px; margin: 38px 0 10px; padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+h3 { font-size: 16.5px; margin: 26px 0 4px; }
+p, li { word-break: break-word; }
+ul, ol { padding-left: 22px; }
+li { margin: 4px 0; }
+blockquote {
+  margin: 0 0 22px; padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--line); color: var(--muted);
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code, pre { background: var(--code); border-radius: 6px; }
+pre { padding: 12px; overflow-x: auto; font-size: 13px; }
+strong { font-weight: 600; }
+footer {
+  margin-top: 52px; padding-top: 16px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 13px;
+}
+.archive { list-style: none; padding: 0; margin: 8px 0 0; }
+.archive li {
+  display: flex; gap: 14px; align-items: baseline;
+  padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.archive .d { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.archive .sub { color: var(--muted); font-size: 13px; }
+.archive .none { color: var(--muted); }
+
+/* ---------------- 图文版 / 文字版 切换（纯 CSS，不用 JS） ----------------
+   兄弟选择器 `~` 要求 radio 必须排在 .view / .vswitch **前面**，且同为 .wrap 的子元素。
+   用 radio 而不是一段 JS：邮件客户端、RSS 阅读器、企业策略下 JS 可能被禁，
+   而这几类正是本报告的读者可能遇到的环境。代价是**选择不会跨页记住**。
+   ⚠️ 这段注释里不要写出尖括号标签名 —— `_PAGE_CSS` 是内联进 `<style>` 的，
+   一旦出现结束标签就会把整个样式块提前截断。见下方 `_theme_script_is_safe` 的守卫。 */
+.vmode { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.has-toggle .view { display: none; }
+.has-toggle #v-rich:checked ~ .view-rich { display: block; }
+.has-toggle #v-plain:checked ~ .view-plain { display: block; }
+/* ⚠️ 控件行必须是 radio 的**后置兄弟**，`~` 才够得到；标签再嵌一层 .vswitch 不影响，
+   但选择器要写成 `~ .ctrls label[…]`，不能写成 `~ .vswitch label[…]`。 */
+.ctrls {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 9px; margin: -10px 0 18px;
+}
+.vswitch { display: flex; }
+.vswitch label {
+  cursor: pointer; font-size: 13px; padding: 5px 14px; user-select: none;
+  border: 1px solid var(--line); color: var(--muted); background: var(--bg);
+}
+.vswitch label:first-of-type { border-radius: 999px 0 0 999px; }
+.vswitch label:last-of-type { border-radius: 0 999px 999px 0; border-left: 0; }
+.has-toggle #v-rich:checked ~ .ctrls label[for="v-rich"],
+.has-toggle #v-plain:checked ~ .ctrls label[for="v-plain"] {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+/* 无 JS 时按钮保持 hidden，不显示一个点了没反应的假按钮。 */
+.themebtn {
+  font: inherit; font-size: 13px; padding: 5px 14px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--bg); color: var(--muted); white-space: nowrap;
+}
+.themebtn:hover { color: var(--fg); border-color: var(--muted); }
+.themebtn[hidden] { display: none; }
+
+/* ---------------- 报告头 ---------------- */
+.hero {
+  background: var(--tint); border: 1px solid var(--line); border-radius: 14px;
+  padding: 22px 22px 18px; margin-bottom: 20px;
+}
+.hero .kicker {
+  font-size: 12.5px; font-weight: 600; letter-spacing: .1em;
+  color: var(--accent); margin-bottom: 6px;
+}
+.hero h1 { margin: 0 0 14px; line-height: 1.3; }
+.hero h1 .h1a { font-size: 19px; font-weight: 500; }
+.hero h1 .h1b {
+  font-size: 27px; font-weight: 700; margin-left: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.hero .meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.hero .lead { margin-top: 15px; padding-top: 14px; border-top: 1px solid var(--line); }
+.hero .lead p { margin: 0 0 8px; font-size: 15px; }
+.hero .lead p:last-child { margin-bottom: 0; }
+.chip {
+  font-size: 12.5px; padding: 3px 11px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--muted);
+}
+
+/* ---------------- 目录 ---------------- */
+.toc {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--tint);
+  padding: 15px 19px; margin-bottom: 24px;
+}
+.toc-t {
+  font-size: 12.5px; color: var(--muted); letter-spacing: .06em; margin-bottom: 9px;
+}
+.toc ul { list-style: none; padding: 0; margin: 0; }
+.toc li { margin: 7px 0; }
+.toc a { display: flex; gap: 10px; align-items: baseline; }
+.toc a:hover { text-decoration: none; }
+.toc a:hover .toc-t2 { text-decoration: underline; }
+.toc .tn {
+  flex: none; width: 20px; height: 20px; border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--accent);
+  font-size: 12px; font-weight: 600; line-height: 19px; text-align: center;
+}
+.toc .toc-t2 { font-size: 14.5px; color: var(--fg); }
+.toc .tc { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+/* ---------------- 板块卡片 ---------------- */
+section[id] { scroll-margin-top: 16px; }
+.card {
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 20px 14px; margin-bottom: 22px;
+}
+.sec-head { display: flex; align-items: center; gap: 11px; margin: 0 0 12px; }
+.sec-num {
+  flex: none; width: 30px; height: 30px; border-radius: 9px;
+  background: var(--accent); color: #fff; font-size: 15px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.sec-title { font-size: 18.5px; font-weight: 600; line-height: 1.4; }
+.sec-count { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+/* ---------------- 条目 ---------------- */
+.entry { padding: 15px 0 4px; border-top: 1px dashed var(--line); }
+.entry:first-of-type { border-top: 0; padding-top: 2px; }
+.entry-head { margin: 0 0 9px; font-size: 16.5px; line-height: 1.55; font-weight: 600; }
+.entry-head .idx {
+  display: inline-block; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 5px; background: var(--tint); border: 1px solid var(--line);
+  color: var(--muted); font-size: 11.5px; font-weight: 600;
+  line-height: 17px; text-align: center; vertical-align: 2px; margin-right: 7px;
+}
+.entry-head .vendor { color: var(--accent); }
+.entry-head .etitle { font-weight: 500; }
+.entry-head .dash { color: var(--muted); font-weight: 400; }
+.rbadge {
+  display: inline-block; padding: 2px 12px; border-radius: 999px;
+  background: var(--tint); border: 1px solid var(--line);
+  color: var(--accent); font-size: 14px; font-weight: 600;
+}
+.pts { list-style: none; padding: 0; margin: 0 0 4px; }
+.pts li { position: relative; padding-left: 17px; margin: 7px 0; }
+.pts li::before {
+  content: ""; position: absolute; left: 3px; top: .68em;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--muted); opacity: .55;
+}
+.entry .src {
+  margin: 12px 0 0; padding-top: 9px; border-top: 1px dotted var(--line);
+  font-size: 13px; color: var(--muted); line-height: 1.9;
+}
+.entry .src .lbl { font-weight: 600; color: var(--muted); }
+.entry .feat {
+  margin: 11px 0 2px; padding: 10px 14px;
+  border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+  background: var(--accent-soft); font-size: 14.5px;
+}
+.entry .feat .lbl { color: var(--accent); font-weight: 700; margin-right: 6px; }
+
+/* ---------------- 板块五：建议 ---------------- */
+.advice { list-style: none; padding: 0; margin: 0; counter-reset: adv; }
+.advice li {
+  counter-increment: adv; position: relative;
+  padding: 13px 0 13px 40px; border-top: 1px dashed var(--line);
+}
+.advice li:first-child { border-top: 0; }
+.advice li::before {
+  content: counter(adv); position: absolute; left: 0; top: 13px;
+  width: 25px; height: 25px; border-radius: 8px;
+  background: var(--tint); border: 1px solid var(--line); color: var(--accent);
+  font-size: 13px; font-weight: 700; line-height: 24px; text-align: center;
+}
+.advice .adv-lead { margin: 0 0 6px; font-weight: 600; font-size: 15.5px; }
+.advice p { margin: 0; }
+.signoff {
+  margin: 14px 0 0; padding-top: 10px; border-top: 1px dotted var(--line);
+  color: var(--muted); font-size: 12.5px;
+}
+
+@media (max-width: 520px) {
+  .wrap { padding: 16px 15px 56px; }
+  .archive li { flex-direction: column; gap: 2px; }
+  .card { padding: 15px 15px 11px; }
+  .hero { padding: 18px 16px 15px; }
+  .hero h1 .h1b { font-size: 23px; margin-left: 8px; }
+  .sec-count { display: none; }
+  .toc .tc { display: none; }
+  .entry-head { font-size: 15.5px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap has-toggle">
+<nav class="top"><a href="2026-10-10.html">← 上一期</a><a href="index.html">全部往期</a><span class="disabled">下一期 →</span></nav>
+<input type="radio" name="view" id="v-rich" class="vmode" checked><input type="radio" name="view" id="v-plain" class="vmode"><div class="ctrls"><span class="vswitch"><label for="v-rich">图文版</label><label for="v-plain">文字版</label></span><button type="button" class="themebtn" id="themebtn" hidden>深色</button></div><div class="view view-rich"><main><header class="hero"><div class="kicker">储能结构周报</div><h1>2026-10-12</h1><div class="meta"><span class="chip">本期 7 条</span><span class="chip">覆盖周期：2026-09-28 ~ 2026-10-12</span><span class="chip">面向储能结构工程师</span></div></header><div class="toc"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">2 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">3 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">2 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></div><section class="card" id="sec-1"><div class="sec-head"><span class="sec-num">一</span><span class="sec-title">便携&amp;阳台储能竞品动态</span><span class="sec-count">2 条</span></div><article class="entry">
+<h3 class="entry-head"><span class="idx">1</span><span class="vendor">Anker SOLIX</span><span class="dash"> —— </span><span class="etitle">S5000 将 5kWh 级便携电源做成双电压滚轮式家庭备电设备</span></h3>
+<ul class="pts">
+<li><strong>时间</strong>：Anker SOLIX 于 2026 年 10 月 9 日发布 S5000，计划 10 月 27 日上市。</li>
+<li><strong>规格</strong>：容量 5,024Wh，额定输出 4,500W，峰值输出 8,000W；支持 120V 与 240V 负载，最高 3,000W 光伏输入。</li>
+<li><strong>结构变化</strong>：整机重量 97lb（约 43.998kg），体积 58L；厂商称相较选定的 5kWh 级竞品轻 28%、体积小 45%，但未披露对应前代型号，不能换算为相对 Anker 前代的变化比例。</li>
+<li><strong>电芯与材料</strong>：采用 314Ah 磷酸铁锂电芯，标称最高 10,000 次循环，预计使用寿命最高 15 年；容量可由 5kWh 扩展至 30kWh。</li>
+<li><strong>接口与架构</strong>：配置滚轮与伸缩拉杆；UPS 切换时间 10ms，120V 电源充电时仍可保持 240V 输出。</li>
+<li><strong>缺口</strong>：未公开长宽高、IP 防护等级、外壳材料、内部堆叠方式及正式售价。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.einpresswire.com/article/947603997/anker-introduces-the-anker-solix-s5000-the-longest-lasting-5kwh-portable-power-station" target="_blank" rel="noopener noreferrer">EIN Presswire</a> ｜ <a href="https://9to5toys.com/author/reinette/" target="_blank" rel="noopener noreferrer">9to5Toys</a></p>
+<p class="feat"><span class="lbl">特点</span> S5000 的结构重点是用约 44kg 的滚轮式机身同时承载双电压、高功率和 30kWh 扩展，产品形态已从户外电源向可移动家庭备电设备偏移。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="idx">2</span><span class="vendor">EcoFlow</span><span class="dash"> —— </span><span class="etitle">DELTA 3 Classic 与 DELTA 3 Max Plus 形成 1kWh/2kWh 双容量便携组合</span></h3>
+<ul class="pts">
+<li><strong>时间</strong>：两款产品于 2026 年 10 月 2—5 日台湾户外用品展公开展示。</li>
+<li><strong>规格</strong>：DELTA 3 Classic 容量 1,024Wh、AC 额定输出 1,800W、重量约 12.1kg；DELTA 3 Max Plus 容量 2,048Wh、AC 额定输出 3,000W。</li>
+<li><strong>接口与架构</strong>：DELTA 3 Max Plus 支持最高 1,000W 光伏输入，可外接扩展电池提升至约 6kWh；App 支持设置设备供电优先级。</li>
+<li><strong>结构变化</strong>：现有报道未披露两款产品相对前代的体积或重量变化百分比，也未给出两款产品的长宽高。</li>
+<li><strong>价格</strong>：DELTA 3 Classic 台湾总代理建议售价为 NT$19,900；DELTA 3 Max Plus 价格未披露。</li>
+<li><strong>缺口</strong>：DELTA 3 Classic 的光伏输入规格、DELTA 3 Max Plus 的重量与尺寸、电芯型号、散热方式、IP 防护等级和循环寿命均未公开。</li>
+</ul>
+<p>本周期未检索到 <strong>BLUETTI、DJI Power、Goal Zero、Segway、Oupes、Vtoman、Eco-Worthy、Hoymiles、Zendure、PowerOak</strong> 在 2026 年 9 月 28 日至 10 月 12 日期间、且不重复上一期内容的可核实新品或结构改款文章详情页。</p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.storm.mg/lifestyle/11168994" target="_blank" rel="noopener noreferrer">风传媒</a></p>
+<p class="feat"><span class="lbl">特点</span> EcoFlow 以 1kWh 轻量机和 2kWh 高功率机分层覆盖便携与家庭备电，但公开信息不足以判断外壳及内部堆叠是否相对前代改型。</p>
+</article></section><section class="card" id="sec-2"><div class="sec-head"><span class="sec-num">二</span><span class="sec-title">户用&amp;工商业储能与大机动态</span><span class="sec-count">3 条</span></div><article class="entry">
+<h3 class="entry-head"><span class="idx">1</span><span class="vendor">APsystems</span><span class="dash"> —— </span><span class="etitle">APstorage 261L 将液冷、消防与预装配集成到 261kWh 级工商业柜体</span></h3>
+<ul class="pts">
+<li><strong>规格</strong>：APstorage 261L 为一体化液冷工商业储能系统，单柜容量、额定功率及电芯型号未公开；支持最多 10 台并联，总储能容量最高 2MWh。</li>
+<li><strong>结构变化</strong>：单柜占地约 1.3m²，采用工厂预装配，厂商称可使现场安装时间缩短超过 40%。</li>
+<li><strong>防护与寿命</strong>：电池包达到 IP65，柜体采用 C4/C5 防腐等级，并通过 UL 9540A 热失控火灾蔓延测试。</li>
+<li><strong>接口与架构</strong>：APstorage 2000L 采用簇级独立管理架构，单个 PCS 故障时仍可维持其他簇运行，并支持构网与黑启动。</li>
+<li><strong>缺口</strong>：未公开 261L 的外形尺寸、重量、液冷回路参数、系统循环寿命、能量密度、额定输出功率及售价。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.prnewswire.com/news-releases/apsystems-to-showcase-advanced-ci-energy-storage-solutions-at-smart-energy-forum-2026-302905058.html" target="_blank" rel="noopener noreferrer">PR Newswire</a></p>
+<p class="feat"><span class="lbl">特点</span> APsystems 的路线是把液冷、IP 防护、腐蚀防护、消防验证和工厂预装集中到标准柜体，结构设计重点从单纯承载转向现场安装效率与环境耐久性。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="idx">2</span><span class="vendor">HIZENERGY</span><span class="dash"> —— </span><span class="etitle">ES125kW-261/313kWh-LE 以液冷柜和构网型 PCS 覆盖欧洲 C&amp;I 场景</span></h3>
+<ul class="pts">
+<li><strong>规格</strong>：ES125kW-261/313kWh-LE 配套 125kW PCS，系统容量为 261kWh 或 313kWh；EnerBox 液冷柜占地 1.7m²。</li>
+<li><strong>接口与架构</strong>：系统支持 VSG 构网和黑启动，并可通过并联 PCS 扩容，面向中小型商业场地及大型工业园区两类部署。</li>
+<li><strong>防护与寿命</strong>：采用 LFP 电芯，厂商披露循环寿命超过 8,000 次，并配置多级消防安全机制。</li>
+<li><strong>安装要求</strong>：产品按 IEC 及 VDE 欧洲并网规范设计，支持 -30°C 至 60°C 的宽温运行。</li>
+<li><strong>缺口</strong>：未公开柜体长宽高、重量、IP 防护等级、液冷介质与换热器参数、能量密度、消防测试标准及价格。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.eqs-news.com/news/corporate/hizenergy-presented-full-stack-ci-energy-storage-solutions-at-two-european-exhibitions-in-september/307c199e-e40f-4fa6-8881-34ef028d3af5_en" target="_blank" rel="noopener noreferrer">EQS News</a></p>
+<p class="feat"><span class="lbl">特点</span> HIZENERGY 的工程取向是用液冷、并联 PCS 和预先适配欧洲并网规范降低项目定制量，但公开资料仍不足以判断柜内电芯、冷板和消防分区的具体布置。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="idx">3</span><span class="vendor">Fox ESS</span><span class="dash"> —— </span><span class="etitle">Power Beast 用堆叠式高压电池覆盖 28kWh 至 96MWh 的 C&amp;I 配置</span></h3>
+<ul class="pts">
+<li><strong>规格</strong>：Power Beast 将 125kW H3 Plus 混合逆变器与 CQ 系列高压 LFP 电池组合，单逆变器配置可由 28kWh 扩展至接近 1,000kWh。</li>
+<li><strong>接口与架构</strong>：并网模式最多 100 套并联，对应最高 96MWh；离网模式最多 30 套并联，对应最高 28.8MWh。</li>
+<li><strong>结构变化</strong>：CQ20 采用模块化电池与混合逆变器一体化设计；厂商称现场组装 316kWh 系统用时不足 30 分钟。</li>
+<li><strong>制造性</strong>：厂商声称模块化设计可将总安装时间缩短 90%，但未披露对比基准及测试条件。</li>
+<li><strong>缺口</strong>：未公开电池模块尺寸与重量、堆叠方式、散热架构、IP 防护等级、循环寿命、系统认证、质保和价格。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.pv-magazine-australia.com/2026/10/05/fox-ess-launches-modular-ci-battery-system-scalable-to-96-mwh/" target="_blank" rel="noopener noreferrer">pv magazine Australia</a></p>
+<p class="feat"><span class="lbl">特点</span> Power Beast 的核心不是单柜能量密度，而是逆变器与高压电池模块的快速组合；结构团队需要重点验证模块接口、堆叠公差和现场快速连接对长期可靠性的影响。</p>
+</article></section><section class="card" id="sec-3"><div class="sec-head"><span class="sec-num">三</span><span class="sec-title">电池与材料技术突破</span><span class="sec-count">2 条</span></div><article class="entry">
+<h3 class="entry-head"><span class="idx">2</span><span class="vendor">电池封装技术</span><span class="dash"> —— </span><span class="etitle">近期公开资料把电芯膨胀明确为独立结构载荷工况</span></h3>
+<ul class="pts">
+<li><strong>膨胀力</strong>：公开工程资料建议，软包电芯压紧面压力设计范围为 5–15psi，电芯厚度变化可按 2–5mm 量级进行结构补偿；最大膨胀状态下，设计应保证剩余面压仍高于 3psi。</li>
+<li><strong>结构件</strong>：端板可采用碟簧或波簧维持预紧力，避免刚性端板在电芯循环膨胀后失去压紧能力。</li>
+<li><strong>结构胶</strong>：CTB/CTP 结构中的胶层建议控制在 0.5–2.0mm，并通过受控柔顺性吸收电芯膨胀和金属壳体热膨胀差异。</li>
+<li><strong>热膨胀</strong>：公开资料给出铝材线膨胀系数约 \(23\times10^{-6}/K\)，电芯复合电极堆叠约 \(15\times10^{-6}/K\)；500mm 铝壳体在 -20°C 至 60°C 温差下相对电芯的差异变形约 0.46mm。</li>
+<li><strong>设计含义</strong>：结构胶、TIM、压缩泡棉不能承担同一种功能；导热界面材料应负责热路径，结构胶应控制在承担机械载荷的区域，膨胀缓冲件则需要有明确的力—位移曲线。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.oembatterypack.com/blog/advanced-battery-packaging-2026" target="_blank" rel="noopener noreferrer">OEM Battery Pack</a></p>
+<p class="feat"><span class="lbl">特点</span> 对 Pack 结构最直接的启发是把膨胀、热膨胀失配和胶层蠕变分别建模，不能再用单一硬连接同时解决承载、导热和密封。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="idx">3</span><span class="vendor">PC/ABS 阻燃材料</span><span class="dash"> —— </span><span class="etitle">新公开牌号将 1.5mm 壁厚 UL94 V-0 作为注塑结构件的明确指标</span></h3>
+<ul class="pts">
+<li><strong>材料牌号</strong>：公开资料列出 G01PCAB-SG10V0，采用 10% 玻纤增强 PC/ABS，标称无卤并达到 1.5mm 壁厚 UL94 V-0。</li>
+<li><strong>其他牌号</strong>：G01PCAB-SN01V0 与 G01PCAB-SN02V0 均标称无卤 UL94 V-0，适用于 1.5mm 壁厚；后者强调高流动性。</li>
+<li><strong>附加性能</strong>：G01PCAB-SAS001V0 为抗静电阻燃 PC/ABS，表面电阻标称 \(10^9\)–\(10^{11}\Omega\)，并达到 1.5mm UL94 V-0。</li>
+<li><strong>结构影响</strong>：若实际零件截面满足牌号认证厚度，可为高压盖板、端子护罩和内部隔离件提供减薄空间；但玻纤增强会增加各向异性收缩和装配公差风险。</li>
+<li><strong>缺口</strong>：公开页面未给出拉伸强度、弯曲强度、缺口冲击、热变形温度、模具温度、注射速度及批量尺寸稳定性数据。</li>
+</ul>
+<p>本周期未检索到同时满足时间窗口、公开具体牌号及量化性能指标的储能专用钣金减薄、压铸铝壳体、导热密封胶或气凝胶新产品详情页。</p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.ghpc.com.tw/showproduct.asp?channelid=71&amp;lang=tw&amp;ID=139" target="_blank" rel="noopener noreferrer">光华科技材料页面</a></p>
+<p class="feat"><span class="lbl">特点</span> 这批材料的可用价值在于把阻燃等级、壁厚和抗静电指标绑定到具体牌号，结构件选材不能只写“阻燃 PC/ABS”，必须锁定认证厚度与成型公差。</p>
+</article></section><section class="card" id="sec-4"><div class="sec-head"><span class="sec-num">四</span><span class="sec-title">安规与政策大事件</span><span class="sec-count">3 个地区</span></div><article class="entry">
+<h3 class="entry-head"><span class="rbadge">北美</span></h3>
+<ul class="pts">
+<li><strong>产品安规与认证</strong>：UL 9540A 第 6 版已发布，2026 版 NFPA 855 将大型火灾测试要求进一步写入 ESS 安全框架；住宅 BESS 仍需进行单元级测试，非住宅系统在特定条件下可由模块级测试衔接安装级大型火灾测试。</li>
+<li><strong>结构设计影响</strong>：UL 9540A 安装级测试将关注热失控后的火焰传播、可燃气体点燃、爆燃后壳体状态、相邻设备间距及室内消防系统效果，柜体泄压、隔舱和相邻柜热辐射不能只按常温工况设计。</li>
+<li><strong>安装与维护</strong>：NFPA 855 2026 版将危险缓解分析作为多数 ESS 安装的默认要求，并要求应急响应计划年度复审及年度复训记录。</li>
+<li><strong>测试接口</strong>：涉及热失控传播抑制的主动系统，需要在 UL 9540A 与 NFPA 855 规定的测试逻辑下证明其有效性；结构、消防、通风和泄压资料应在安装许可阶段提交给 AHJ。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.ul.com/thecodeauthority/knowledge/unlock-compliance-excellence-battery-energy-storage-systems" target="_blank" rel="noopener noreferrer">UL Code Authority</a> ｜ <a href="https://www.ul.com/resources/installation-codes-and-requirements-energy-storage-systems-ess-faqs" target="_blank" rel="noopener noreferrer">UL</a> ｜ <a href="https://www.energy-storage.news/nfpa-855-2026-edition-updates-and-what-they-mean-for-energy-storage-projects/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a></p>
+<p class="feat"><span class="lbl">特点</span> 北美安规正在把大型火灾、爆燃和安装级数据前置到产品结构定义阶段，柜体间距、泄压方向和消防接口必须与测试样机保持一致，不能在项目现场再补救。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="rbadge">欧洲</span></h3>
+<ul class="pts">
+<li><strong>产品安规与认证</strong>：德国 SMA 的 Sunny Central Storage UP-S 获得德国 VDE FNN 构网型能力认证，认证覆盖构网运行及惯量支撑，并建立了构网型设备和电站的测试、验证与认证流程。</li>
+<li><strong>安装与并网</strong>：德国联邦网络局于 2026 年 10 月 1 日通过 MiSpeL 关于储能和充电点市场接入的规定；过渡期至 2027 年 9 月底，部分新选项的使用需取得网络运营商和计量点运营商同意。</li>
+<li><strong>安装人员资质</strong>：欧盟成员国新规要求包括储能在内的光伏及相关系统安装人员通过认可培训机构或等效资格体系认证，培训应同时包含理论和实践内容。</li>
+<li><strong>退役与回收</strong>：欧盟电池法规继续按全生命周期管理电池，覆盖性能与耐久性、碳足迹、回收材料、原材料尽职调查及电池护照等要求；结构设计需预留型号识别、拆解和材料追溯接口。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.ess-news.com/2026/10/05/sma-secures-first-german-certification-for-grid-forming-bess/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a> ｜ <a href="https://www.bundesnetzagentur.de/DE/Fachthemen/ElektrizitaetundGas/ErneuerbareEnergien/EEG_Aufsicht/MiSpeL/start.html" target="_blank" rel="noopener noreferrer">德国联邦网络局</a> ｜ <a href="https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=NIM:202606012" target="_blank" rel="noopener noreferrer">EUR-Lex</a> ｜ <a href="https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=PI_COM:Ares(2026" target="_blank" rel="noopener noreferrer">EUR-Lex</a>9188325)</p>
+<p class="feat"><span class="lbl">特点</span> 欧洲侧的工程约束正在从单一产品 CE 合规扩展到构网能力、安装人员资质、市场接入和全生命周期追溯，控制器、PCS 和结构件的合规资料需要同步建立。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="rbadge">日本</span></h3>
+<ul class="pts">
+<li><strong>并网政策</strong>：日本 OCCTO 更新并网指引，自 2026 年 10 月 1 日起，获得并网批准的项目需在两个月内提交项目场地使用权证明，否则可能失去并网预约。</li>
+<li><strong>申请限制</strong>：输电运营商对单一企业可申请的电网级电池并网研究数量设置上限；电网级电池项目还需同时提交发电侧和用电侧合同申请。</li>
+<li><strong>安装与维护</strong>：日本经济产业省对蓄电装置及蓄电所规定技术标准符合义务、保安规程申报和电气主任技术者配置要求；容量超过 20kWh 的蓄电装置纳入事故报告对象。</li>
+<li><strong>回收与运输</strong>：日本 2026 年 10 月启动锂离子电池安全回收容器和远程监控示范，覆盖回收、运输、储存及处理环节，并将资源回收纳入验证范围。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.pv-magazine.com/2026/10/02/japan-tightens-grid-access-as-battery-queue-reaches-172-gw/" target="_blank" rel="noopener noreferrer">pv magazine</a> ｜ <a href="https://www.meti.go.jp/policy/safety_security/industrial_safety/sangyo/electric/detail/denryokucyozousouchi.html" target="_blank" rel="noopener noreferrer">日本经济产业省</a> ｜ <a href="https://news.tv-asahi.co.jp/news_economy/articles/000538234.html" target="_blank" rel="noopener noreferrer">朝日电视台</a></p>
+<p class="feat"><span class="lbl">特点</span> 日本的新增约束同时落在并网资料、专业安全管理、事故报告和退役回收，储能结构需要兼顾可维护性、事故隔离和后端安全拆解。</p>
+</article></section><section class="card" id="sec-5"><div class="sec-head"><span class="sec-num">五</span><span class="sec-title">对华宝新能（Jackery）结构与产品定义的启发</span><span class="sec-count">3 点建议</span></div>
+<ol class="advice">
+<li><p class="adv-lead">Explorer 系列</p>
+<p>应继续按“可移动但可维护”的 Pack 逻辑定义：电芯压紧、膨胀缓冲、结构胶和导热界面材料分工设计，避免用刚性粘接同时承担导热、承载和寿命补偿。对于高容量机型，端板、拉杆、滚轮和提手应按满载搬运、跌落及循环膨胀的组合载荷验证，而不是只按静态重量校核。</p>
+</li>
+<li><p class="adv-lead">HomePower</p>
+<p>与 <strong>SolarVault</strong> 可借鉴工商业系统的预装配思路，把液冷回路、消防隔离、PCS 接口、维护通道和更换单元在结构阶段统一定义。欧洲构网认证和北美 UL 9540A/NFPA 855 对测试样机一致性的要求，意味着柜体泄压方向、隔舱、门锁、线束走向和传感器位置应在认证前冻结。</p>
+</li>
+<li><p class="adv-lead">SolarSaga</p>
+<p>与 <strong>FridgeGuard</strong> 的轻量化应优先采用可追溯的阻燃 PC/ABS、玻纤增强件、薄壁钣金和受控胶层，而不是单纯减薄。对 <strong>FridgeGuard</strong> 这类超薄卧式 CTB 结构，应把约 67mm 机身内的电芯膨胀、密封压缩量、散热路径和壁挂载荷作为联立约束，并在设计初期建立拆解、维修和回收所需的可达性。</p>
+</li>
+</ol>
+<p class="signoff">—— 本消息由自动化脚本生成，检索源：Perplexity sonar-pro-search</p></section></main></div><div class="view view-plain"><main><h1>[行业资讯] 储能结构周报（2026-10-12）</h1>
+<blockquote>覆盖周期：2026-09-28 ~ 2026-10-12 ｜ 面向储能结构工程师</blockquote>
+<h2 id="p-1">一、便携&amp;阳台储能竞品动态</h2>
+<h3>1. <strong>Anker SOLIX</strong> —— S5000 将 5kWh 级便携电源做成双电压滚轮式家庭备电设备</h3>
+<ul><li><strong>时间</strong>：Anker SOLIX 于 2026 年 10 月 9 日发布 S5000，计划 10 月 27 日上市。</li><li><strong>规格</strong>：容量 5,024Wh，额定输出 4,500W，峰值输出 8,000W；支持 120V 与 240V 负载，最高 3,000W 光伏输入。</li><li><strong>结构变化</strong>：整机重量 97lb（约 43.998kg），体积 58L；厂商称相较选定的 5kWh 级竞品轻 28%、体积小 45%，但未披露对应前代型号，不能换算为相对 Anker 前代的变化比例。</li><li><strong>电芯与材料</strong>：采用 314Ah 磷酸铁锂电芯，标称最高 10,000 次循环，预计使用寿命最高 15 年；容量可由 5kWh 扩展至 30kWh。</li><li><strong>接口与架构</strong>：配置滚轮与伸缩拉杆；UPS 切换时间 10ms，120V 电源充电时仍可保持 240V 输出。</li><li><strong>缺口</strong>：未公开长宽高、IP 防护等级、外壳材料、内部堆叠方式及正式售价。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.einpresswire.com/article/947603997/anker-introduces-the-anker-solix-s5000-the-longest-lasting-5kwh-portable-power-station" target="_blank" rel="noopener noreferrer">EIN Presswire</a> ｜ <a href="https://9to5toys.com/author/reinette/" target="_blank" rel="noopener noreferrer">9to5Toys</a></p>
+<p><strong>特点</strong>：S5000 的结构重点是用约 44kg 的滚轮式机身同时承载双电压、高功率和 30kWh 扩展，产品形态已从户外电源向可移动家庭备电设备偏移。</p>
+<h3>2. <strong>EcoFlow</strong> —— DELTA 3 Classic 与 DELTA 3 Max Plus 形成 1kWh/2kWh 双容量便携组合</h3>
+<ul><li><strong>时间</strong>：两款产品于 2026 年 10 月 2—5 日台湾户外用品展公开展示。</li><li><strong>规格</strong>：DELTA 3 Classic 容量 1,024Wh、AC 额定输出 1,800W、重量约 12.1kg；DELTA 3 Max Plus 容量 2,048Wh、AC 额定输出 3,000W。</li><li><strong>接口与架构</strong>：DELTA 3 Max Plus 支持最高 1,000W 光伏输入，可外接扩展电池提升至约 6kWh；App 支持设置设备供电优先级。</li><li><strong>结构变化</strong>：现有报道未披露两款产品相对前代的体积或重量变化百分比，也未给出两款产品的长宽高。</li><li><strong>价格</strong>：DELTA 3 Classic 台湾总代理建议售价为 NT$19,900；DELTA 3 Max Plus 价格未披露。</li><li><strong>缺口</strong>：DELTA 3 Classic 的光伏输入规格、DELTA 3 Max Plus 的重量与尺寸、电芯型号、散热方式、IP 防护等级和循环寿命均未公开。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.storm.mg/lifestyle/11168994" target="_blank" rel="noopener noreferrer">风传媒</a></p>
+<p><strong>特点</strong>：EcoFlow 以 1kWh 轻量机和 2kWh 高功率机分层覆盖便携与家庭备电，但公开信息不足以判断外壳及内部堆叠是否相对前代改型。</p>
+<p>本周期未检索到 <strong>BLUETTI、DJI Power、Goal Zero、Segway、Oupes、Vtoman、Eco-Worthy、Hoymiles、Zendure、PowerOak</strong> 在 2026 年 9 月 28 日至 10 月 12 日期间、且不重复上一期内容的可核实新品或结构改款文章详情页。</p>
+<h2 id="p-2">二、户用&amp;工商业储能与大机动态</h2>
+<h3>1. <strong>APsystems</strong> —— APstorage 261L 将液冷、消防与预装配集成到 261kWh 级工商业柜体</h3>
+<ul><li><strong>规格</strong>：APstorage 261L 为一体化液冷工商业储能系统，单柜容量、额定功率及电芯型号未公开；支持最多 10 台并联，总储能容量最高 2MWh。</li><li><strong>结构变化</strong>：单柜占地约 1.3m²，采用工厂预装配，厂商称可使现场安装时间缩短超过 40%。</li><li><strong>防护与寿命</strong>：电池包达到 IP65，柜体采用 C4/C5 防腐等级，并通过 UL 9540A 热失控火灾蔓延测试。</li><li><strong>接口与架构</strong>：APstorage 2000L 采用簇级独立管理架构，单个 PCS 故障时仍可维持其他簇运行，并支持构网与黑启动。</li><li><strong>缺口</strong>：未公开 261L 的外形尺寸、重量、液冷回路参数、系统循环寿命、能量密度、额定输出功率及售价。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.prnewswire.com/news-releases/apsystems-to-showcase-advanced-ci-energy-storage-solutions-at-smart-energy-forum-2026-302905058.html" target="_blank" rel="noopener noreferrer">PR Newswire</a></p>
+<p><strong>特点</strong>：APsystems 的路线是把液冷、IP 防护、腐蚀防护、消防验证和工厂预装集中到标准柜体，结构设计重点从单纯承载转向现场安装效率与环境耐久性。</p>
+<h3>2. <strong>HIZENERGY</strong> —— ES125kW-261/313kWh-LE 以液冷柜和构网型 PCS 覆盖欧洲 C&amp;I 场景</h3>
+<ul><li><strong>规格</strong>：ES125kW-261/313kWh-LE 配套 125kW PCS，系统容量为 261kWh 或 313kWh；EnerBox 液冷柜占地 1.7m²。</li><li><strong>接口与架构</strong>：系统支持 VSG 构网和黑启动，并可通过并联 PCS 扩容，面向中小型商业场地及大型工业园区两类部署。</li><li><strong>防护与寿命</strong>：采用 LFP 电芯，厂商披露循环寿命超过 8,000 次，并配置多级消防安全机制。</li><li><strong>安装要求</strong>：产品按 IEC 及 VDE 欧洲并网规范设计，支持 -30°C 至 60°C 的宽温运行。</li><li><strong>缺口</strong>：未公开柜体长宽高、重量、IP 防护等级、液冷介质与换热器参数、能量密度、消防测试标准及价格。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.eqs-news.com/news/corporate/hizenergy-presented-full-stack-ci-energy-storage-solutions-at-two-european-exhibitions-in-september/307c199e-e40f-4fa6-8881-34ef028d3af5_en" target="_blank" rel="noopener noreferrer">EQS News</a></p>
+<p><strong>特点</strong>：HIZENERGY 的工程取向是用液冷、并联 PCS 和预先适配欧洲并网规范降低项目定制量，但公开资料仍不足以判断柜内电芯、冷板和消防分区的具体布置。</p>
+<h3>3. <strong>Fox ESS</strong> —— Power Beast 用堆叠式高压电池覆盖 28kWh 至 96MWh 的 C&amp;I 配置</h3>
+<ul><li><strong>规格</strong>：Power Beast 将 125kW H3 Plus 混合逆变器与 CQ 系列高压 LFP 电池组合，单逆变器配置可由 28kWh 扩展至接近 1,000kWh。</li><li><strong>接口与架构</strong>：并网模式最多 100 套并联，对应最高 96MWh；离网模式最多 30 套并联，对应最高 28.8MWh。</li><li><strong>结构变化</strong>：CQ20 采用模块化电池与混合逆变器一体化设计；厂商称现场组装 316kWh 系统用时不足 30 分钟。</li><li><strong>制造性</strong>：厂商声称模块化设计可将总安装时间缩短 90%，但未披露对比基准及测试条件。</li><li><strong>缺口</strong>：未公开电池模块尺寸与重量、堆叠方式、散热架构、IP 防护等级、循环寿命、系统认证、质保和价格。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.pv-magazine-australia.com/2026/10/05/fox-ess-launches-modular-ci-battery-system-scalable-to-96-mwh/" target="_blank" rel="noopener noreferrer">pv magazine Australia</a></p>
+<p><strong>特点</strong>：Power Beast 的核心不是单柜能量密度，而是逆变器与高压电池模块的快速组合；结构团队需要重点验证模块接口、堆叠公差和现场快速连接对长期可靠性的影响。</p>
+<h2 id="p-3">三、电池与材料技术突破</h2>
+<h3>2. <strong>电池封装技术</strong> —— 近期公开资料把电芯膨胀明确为独立结构载荷工况</h3>
+<ul><li><strong>膨胀力</strong>：公开工程资料建议，软包电芯压紧面压力设计范围为 5–15psi，电芯厚度变化可按 2–5mm 量级进行结构补偿；最大膨胀状态下，设计应保证剩余面压仍高于 3psi。</li><li><strong>结构件</strong>：端板可采用碟簧或波簧维持预紧力，避免刚性端板在电芯循环膨胀后失去压紧能力。</li><li><strong>结构胶</strong>：CTB/CTP 结构中的胶层建议控制在 0.5–2.0mm，并通过受控柔顺性吸收电芯膨胀和金属壳体热膨胀差异。</li><li><strong>热膨胀</strong>：公开资料给出铝材线膨胀系数约 \(23\times10^{-6}/K\)，电芯复合电极堆叠约 \(15\times10^{-6}/K\)；500mm 铝壳体在 -20°C 至 60°C 温差下相对电芯的差异变形约 0.46mm。</li><li><strong>设计含义</strong>：结构胶、TIM、压缩泡棉不能承担同一种功能；导热界面材料应负责热路径，结构胶应控制在承担机械载荷的区域，膨胀缓冲件则需要有明确的力—位移曲线。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.oembatterypack.com/blog/advanced-battery-packaging-2026" target="_blank" rel="noopener noreferrer">OEM Battery Pack</a></p>
+<p><strong>特点</strong>：对 Pack 结构最直接的启发是把膨胀、热膨胀失配和胶层蠕变分别建模，不能再用单一硬连接同时解决承载、导热和密封。</p>
+<h3>3. <strong>PC/ABS 阻燃材料</strong> —— 新公开牌号将 1.5mm 壁厚 UL94 V-0 作为注塑结构件的明确指标</h3>
+<ul><li><strong>材料牌号</strong>：公开资料列出 G01PCAB-SG10V0，采用 10% 玻纤增强 PC/ABS，标称无卤并达到 1.5mm 壁厚 UL94 V-0。</li><li><strong>其他牌号</strong>：G01PCAB-SN01V0 与 G01PCAB-SN02V0 均标称无卤 UL94 V-0，适用于 1.5mm 壁厚；后者强调高流动性。</li><li><strong>附加性能</strong>：G01PCAB-SAS001V0 为抗静电阻燃 PC/ABS，表面电阻标称 \(10^9\)–\(10^{11}\Omega\)，并达到 1.5mm UL94 V-0。</li><li><strong>结构影响</strong>：若实际零件截面满足牌号认证厚度，可为高压盖板、端子护罩和内部隔离件提供减薄空间；但玻纤增强会增加各向异性收缩和装配公差风险。</li><li><strong>缺口</strong>：公开页面未给出拉伸强度、弯曲强度、缺口冲击、热变形温度、模具温度、注射速度及批量尺寸稳定性数据。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.ghpc.com.tw/showproduct.asp?channelid=71&amp;lang=tw&amp;ID=139" target="_blank" rel="noopener noreferrer">光华科技材料页面</a></p>
+<p><strong>特点</strong>：这批材料的可用价值在于把阻燃等级、壁厚和抗静电指标绑定到具体牌号，结构件选材不能只写“阻燃 PC/ABS”，必须锁定认证厚度与成型公差。</p>
+<p>本周期未检索到同时满足时间窗口、公开具体牌号及量化性能指标的储能专用钣金减薄、压铸铝壳体、导热密封胶或气凝胶新产品详情页。</p>
+<h2 id="p-4">四、安规与政策大事件</h2>
+<p><strong>北美</strong></p>
+<ul><li><strong>产品安规与认证</strong>：UL 9540A 第 6 版已发布，2026 版 NFPA 855 将大型火灾测试要求进一步写入 ESS 安全框架；住宅 BESS 仍需进行单元级测试，非住宅系统在特定条件下可由模块级测试衔接安装级大型火灾测试。</li><li><strong>结构设计影响</strong>：UL 9540A 安装级测试将关注热失控后的火焰传播、可燃气体点燃、爆燃后壳体状态、相邻设备间距及室内消防系统效果，柜体泄压、隔舱和相邻柜热辐射不能只按常温工况设计。</li><li><strong>安装与维护</strong>：NFPA 855 2026 版将危险缓解分析作为多数 ESS 安装的默认要求，并要求应急响应计划年度复审及年度复训记录。</li><li><strong>测试接口</strong>：涉及热失控传播抑制的主动系统，需要在 UL 9540A 与 NFPA 855 规定的测试逻辑下证明其有效性；结构、消防、通风和泄压资料应在安装许可阶段提交给 AHJ。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.ul.com/thecodeauthority/knowledge/unlock-compliance-excellence-battery-energy-storage-systems" target="_blank" rel="noopener noreferrer">UL Code Authority</a> ｜ <a href="https://www.ul.com/resources/installation-codes-and-requirements-energy-storage-systems-ess-faqs" target="_blank" rel="noopener noreferrer">UL</a> ｜ <a href="https://www.energy-storage.news/nfpa-855-2026-edition-updates-and-what-they-mean-for-energy-storage-projects/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a></p>
+<p><strong>特点</strong>：北美安规正在把大型火灾、爆燃和安装级数据前置到产品结构定义阶段，柜体间距、泄压方向和消防接口必须与测试样机保持一致，不能在项目现场再补救。</p>
+<p><strong>欧洲</strong></p>
+<ul><li><strong>产品安规与认证</strong>：德国 SMA 的 Sunny Central Storage UP-S 获得德国 VDE FNN 构网型能力认证，认证覆盖构网运行及惯量支撑，并建立了构网型设备和电站的测试、验证与认证流程。</li><li><strong>安装与并网</strong>：德国联邦网络局于 2026 年 10 月 1 日通过 MiSpeL 关于储能和充电点市场接入的规定；过渡期至 2027 年 9 月底，部分新选项的使用需取得网络运营商和计量点运营商同意。</li><li><strong>安装人员资质</strong>：欧盟成员国新规要求包括储能在内的光伏及相关系统安装人员通过认可培训机构或等效资格体系认证，培训应同时包含理论和实践内容。</li><li><strong>退役与回收</strong>：欧盟电池法规继续按全生命周期管理电池，覆盖性能与耐久性、碳足迹、回收材料、原材料尽职调查及电池护照等要求；结构设计需预留型号识别、拆解和材料追溯接口。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.ess-news.com/2026/10/05/sma-secures-first-german-certification-for-grid-forming-bess/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a> ｜ <a href="https://www.bundesnetzagentur.de/DE/Fachthemen/ElektrizitaetundGas/ErneuerbareEnergien/EEG_Aufsicht/MiSpeL/start.html" target="_blank" rel="noopener noreferrer">德国联邦网络局</a> ｜ <a href="https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=NIM:202606012" target="_blank" rel="noopener noreferrer">EUR-Lex</a> ｜ <a href="https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=PI_COM:Ares(2026" target="_blank" rel="noopener noreferrer">EUR-Lex</a>9188325)</p>
+<p><strong>特点</strong>：欧洲侧的工程约束正在从单一产品 CE 合规扩展到构网能力、安装人员资质、市场接入和全生命周期追溯，控制器、PCS 和结构件的合规资料需要同步建立。</p>
+<p><strong>日本</strong></p>
+<ul><li><strong>并网政策</strong>：日本 OCCTO 更新并网指引，自 2026 年 10 月 1 日起，获得并网批准的项目需在两个月内提交项目场地使用权证明，否则可能失去并网预约。</li><li><strong>申请限制</strong>：输电运营商对单一企业可申请的电网级电池并网研究数量设置上限；电网级电池项目还需同时提交发电侧和用电侧合同申请。</li><li><strong>安装与维护</strong>：日本经济产业省对蓄电装置及蓄电所规定技术标准符合义务、保安规程申报和电气主任技术者配置要求；容量超过 20kWh 的蓄电装置纳入事故报告对象。</li><li><strong>回收与运输</strong>：日本 2026 年 10 月启动锂离子电池安全回收容器和远程监控示范，覆盖回收、运输、储存及处理环节，并将资源回收纳入验证范围。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.pv-magazine.com/2026/10/02/japan-tightens-grid-access-as-battery-queue-reaches-172-gw/" target="_blank" rel="noopener noreferrer">pv magazine</a> ｜ <a href="https://www.meti.go.jp/policy/safety_security/industrial_safety/sangyo/electric/detail/denryokucyozousouchi.html" target="_blank" rel="noopener noreferrer">日本经济产业省</a> ｜ <a href="https://news.tv-asahi.co.jp/news_economy/articles/000538234.html" target="_blank" rel="noopener noreferrer">朝日电视台</a></p>
+<p><strong>特点</strong>：日本的新增约束同时落在并网资料、专业安全管理、事故报告和退役回收，储能结构需要兼顾可维护性、事故隔离和后端安全拆解。</p>
+<h2 id="p-5">五、对华宝新能（Jackery）结构与产品定义的启发</h2>
+<ol><li><strong>Explorer 系列</strong>应继续按“可移动但可维护”的 Pack 逻辑定义：电芯压紧、膨胀缓冲、结构胶和导热界面材料分工设计，避免用刚性粘接同时承担导热、承载和寿命补偿。对于高容量机型，端板、拉杆、滚轮和提手应按满载搬运、跌落及循环膨胀的组合载荷验证，而不是只按静态重量校核。</li></ol>
+<ol><li><strong>HomePower</strong> 与 <strong>SolarVault</strong> 可借鉴工商业系统的预装配思路，把液冷回路、消防隔离、PCS 接口、维护通道和更换单元在结构阶段统一定义。欧洲构网认证和北美 UL 9540A/NFPA 855 对测试样机一致性的要求，意味着柜体泄压方向、隔舱、门锁、线束走向和传感器位置应在认证前冻结。</li></ol>
+<ol><li><strong>SolarSaga</strong> 与 <strong>FridgeGuard</strong> 的轻量化应优先采用可追溯的阻燃 PC/ABS、玻纤增强件、薄壁钣金和受控胶层，而不是单纯减薄。对 <strong>FridgeGuard</strong> 这类超薄卧式 CTB 结构，应把约 67mm 机身内的电芯膨胀、密封压缩量、散热路径和壁挂载荷作为联立约束，并在设计初期建立拆解、维修和回收所需的可达性。</li></ol>
+<p>—— 本消息由自动化脚本生成，检索源：Perplexity sonar-pro-search</p></main></div>
+<footer>本页由脚本自动生成 ｜ 检索源：Perplexity sonar-pro-search</footer>
+</div>
+</body>
+</html>
