@@ -1,4 +1,132 @@
 {
   "version": 1,
-  "entries": []
+  "entries": [
+    {
+      "title": "DJI Power —— Power Auro 2000 Elite 将 2kWh 便携电源压缩至约 19kg 级",
+      "urls": [
+        "https://www.163.com/dy/article/L7CJEKFI0511B8LM.html",
+        "https://www.chongdiantou.com/archives/1788764558102.html"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "DJI Power —— IFA 阳台光储方案以 Power 2000 作为储能核心",
+      "urls": [
+        "http://www.chinaden.cn/news_nr.asp?id=51416&Small_Class=3",
+        "https://www.chongdiantou.com/archives/1788764558102.html"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "EcoFlow —— RIVER Gen4 以低于 10ms UPS 和小型化切入轻量便携场景",
+      "urls": [
+        "https://news.zol.com.cn/1244/12447538.html",
+        "https://www.ecoflow.com/de/ifa-2026"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "EcoFlow —— PowerRock 4000 用金属壳体和高峰值输出面向专业作业",
+      "urls": [
+        "https://us.best-batteries.com/product-launches/",
+        "https://www.ecoflow.com/de/unternehmen/powerrock/support",
+        "https://www.ecoflow.com/eu/enterprise/powerrock/support"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "EcoFlow —— STREAM 5000 将逆变器、MPPT 和 5kWh 电池合并为模块化家庭储能单元",
+      "urls": [
+        "https://www.ecoflow.com/de/blog/ifa-2026",
+        "https://www.ecoflow.com/eu/stream-series-plug-and-play-solar-battery",
+        "https://www.ecoflow.com/nl/blog/ifa"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "Anker SOLIX —— Solarbank Max 以 7kWh 单机和 10kWp 光伏输入进入家庭储能尺寸段",
+      "urls": [
+        "https://www.ankersolix.com/de/plug-in-solarspeicher/solarbank-max-a17e2",
+        "https://www.ankersolix.com/nl/plug-in-thuisbatterij/solarbank-max-ae111",
+        "https://www.energiemagazin.com/anker-solix-solarbank-max-balkonkraftwerk-speicher-test/"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "BLUETTI —— Balco 500、Pioneer 5000 和 Elite mini 覆盖三种结构尺度",
+      "urls": [
+        "https://stationarena.com/new-releases",
+        "https://us.best-batteries.com/product-launches/",
+        "https://www.chongdiantou.com/archives/1788764558102.html"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "Hoymiles —— HiBattery 4020 以可插拔堆叠和 IP66 防护进入阳台家储",
+      "urls": [
+        "https://shop.hoymiles.com/products/hibattery-4020-x-solar-battery",
+        "https://www.hoymiles.com/product-release.html",
+        "https://www.hoymiles.com/product-release/hoymiles-introduces-hibattery-4020-series-of-plug-in-home-energy-storage-to-bring-solar-safety-and-intelligence-to-the-next-level.html"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "Goal Zero —— Yeti 1500 以 IPX4 和 LFP 电芯强化户外耐候便携",
+      "urls": [
+        "https://goalzero.com/blogs/news/new-yeti-1500-in-the-wild-real-user-reviews",
+        "https://goalzero.com/collections/portable-power-stations"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "Segway —— Cube 2000 采用无线扩展电池和 2kWh 便携主机架构",
+      "urls": [
+        "https://fi-en.segway.com/power-station/products/cube-1000.html",
+        "https://store.segway.com/segway-powerstation-cube2000-sp200"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "Jinko ESS —— Tera 液冷系统支撑德国 220MWh 混合储能组合",
+      "urls": [
+        "https://www.pv-magazine.com/press-releases/jinko-ess-advances-220mwh-hybrid-battery-energy-storage-portfolio-in-germany/"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "JA Solar —— JAPlanet Fusion 将 125kW/261kWh 光储备电集成进单柜",
+      "urls": [
+        "https://www.ess-news.com/2026/09/29/ja-expands-ci-battery-range-with-hybrid-and-updated-ac-coupled-systems/"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "海尔新能源 —— E‑Stack (H) 国际版以 261kWh 液冷一体柜面向海外工商业场景",
+      "urls": [
+        "https://mcn.solarbe.com/news/20261001/50029917.html"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "HIZENERGY —— EnerBox 液冷柜以 1.7㎡占地覆盖 261/313kWh 工商业储能",
+      "urls": [
+        "https://www.adnkronos.com/immediapress/eng/hizenergy-presented-full-stack-c-e-i-energy-storage-solutions-for-the-commercial-and-industrial-sector_5Piufr9E1AgPXpel4sNxGC"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "Fraunhofer ISE —— 厚电极把电芯能量密度提升目标推进至 10%~15%",
+      "urls": [
+        "https://www.pv-magazine.com/2026/09/09/new-electrode-design-increases-battery-energy-density-by-up-to-15/"
+      ],
+      "pushed": "2026-10-12"
+    },
+    {
+      "title": "NUS CDE —— 石墨相氮化碳增强固态钠电解质，降低枝晶穿透风险",
+      "urls": [
+        "https://www.eurekalert.org/news-releases/1129449"
+      ],
+      "pushed": "2026-10-12"
+    }
+  ]
 }

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>储能结构周报 · 往期归档</title>
+<script>
+(function(){
+  var K='weekly-theme', root=document.documentElement;
+  try{
+    var s=localStorage.getItem(K);
+    if(s==='dark'||s==='light')root.setAttribute('data-theme',s);
+  }catch(e){}
+  function wire(){
+    var b=document.getElementById('themebtn');
+    if(!b)return;
+    var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+    function cur(){
+      return root.getAttribute('data-theme')||((mq&&mq.matches)?'dark':'light');
+    }
+    function paint(){b.textContent=(cur()==='dark')?'浅色':'深色';}
+    b.addEventListener('click',function(){
+      var next=(cur()==='dark')?'light':'dark';
+      root.setAttribute('data-theme',next);
+      try{localStorage.setItem(K,next);}catch(e){}
+      paint();
+    });
+    b.hidden=false;
+    paint();
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',wire);
+  }else{
+    wire();
+  }
+})();
+</script>
+<style>
+:root {
+  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
+  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
+  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  color-scheme: light;
+}
+/* 没有显式选择时跟随系统。`:root:not([data-theme])` 与下面的 `:root[data-theme=…]`
+   特异性相同（都是 0,2,0），所以**顺序决定胜负** —— 显式那两条必须在文档里靠后，
+   否则点了按钮不生效。 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
+    --bg:#0d1117; --code:#161b22; --accent:#f0883e;
+    --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
+  --bg:#0d1117; --code:#161b22; --accent:#f0883e;
+  --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
+  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
+  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 820px; margin: 0 auto; padding: 22px 20px 72px; }
+nav.top {
+  display: flex; gap: 12px; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 26px;
+  font-size: 14px;
+}
+nav.top .disabled { color: var(--muted); }
+h1 { font-size: 23px; line-height: 1.45; margin: 0 0 6px; }
+h2 {
+  font-size: 19px; margin: 38px 0 10px; padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+h3 { font-size: 16.5px; margin: 26px 0 4px; }
+p, li { word-break: break-word; }
+ul, ol { padding-left: 22px; }
+li { margin: 4px 0; }
+blockquote {
+  margin: 0 0 22px; padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--line); color: var(--muted);
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code, pre { background: var(--code); border-radius: 6px; }
+pre { padding: 12px; overflow-x: auto; font-size: 13px; }
+strong { font-weight: 600; }
+footer {
+  margin-top: 52px; padding-top: 16px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 13px;
+}
+.archive { list-style: none; padding: 0; margin: 8px 0 0; }
+.archive li {
+  display: flex; gap: 14px; align-items: baseline;
+  padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.archive .d { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.archive .sub { color: var(--muted); font-size: 13px; }
+.archive .none { color: var(--muted); }
+
+/* ---------------- 图文版 / 文字版 切换（纯 CSS，不用 JS） ----------------
+   兄弟选择器 `~` 要求 radio 必须排在 .view / .vswitch **前面**，且同为 .wrap 的子元素。
+   用 radio 而不是一段 JS：邮件客户端、RSS 阅读器、企业策略下 JS 可能被禁，
+   而这几类正是本报告的读者可能遇到的环境。代价是**选择不会跨页记住**。
+   ⚠️ 这段注释里不要写出尖括号标签名 —— `_PAGE_CSS` 是内联进 `<style>` 的，
+   一旦出现结束标签就会把整个样式块提前截断。见下方 `_theme_script_is_safe` 的守卫。 */
+.vmode { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.has-toggle .view { display: none; }
+.has-toggle #v-rich:checked ~ .view-rich { display: block; }
+.has-toggle #v-plain:checked ~ .view-plain { display: block; }
+/* ⚠️ 控件行必须是 radio 的**后置兄弟**，`~` 才够得到；标签再嵌一层 .vswitch 不影响，
+   但选择器要写成 `~ .ctrls label[…]`，不能写成 `~ .vswitch label[…]`。 */
+.ctrls {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 9px; margin: -10px 0 18px;
+}
+.vswitch { display: flex; }
+.vswitch label {
+  cursor: pointer; font-size: 13px; padding: 5px 14px; user-select: none;
+  border: 1px solid var(--line); color: var(--muted); background: var(--bg);
+}
+.vswitch label:first-of-type { border-radius: 999px 0 0 999px; }
+.vswitch label:last-of-type { border-radius: 0 999px 999px 0; border-left: 0; }
+.has-toggle #v-rich:checked ~ .ctrls label[for="v-rich"],
+.has-toggle #v-plain:checked ~ .ctrls label[for="v-plain"] {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+/* 无 JS 时按钮保持 hidden，不显示一个点了没反应的假按钮。 */
+.themebtn {
+  font: inherit; font-size: 13px; padding: 5px 14px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--bg); color: var(--muted); white-space: nowrap;
+}
+.themebtn:hover { color: var(--fg); border-color: var(--muted); }
+.themebtn[hidden] { display: none; }
+
+/* ---------------- 报告头 ---------------- */
+.hero {
+  background: var(--tint); border: 1px solid var(--line); border-radius: 14px;
+  padding: 22px 22px 18px; margin-bottom: 20px;
+}
+.hero .kicker {
+  font-size: 12.5px; font-weight: 600; letter-spacing: .1em;
+  color: var(--accent); margin-bottom: 6px;
+}
+.hero h1 { margin: 0 0 14px; line-height: 1.3; }
+.hero h1 .h1a { font-size: 19px; font-weight: 500; }
+.hero h1 .h1b {
+  font-size: 27px; font-weight: 700; margin-left: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.hero .meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.hero .lead { margin-top: 15px; padding-top: 14px; border-top: 1px solid var(--line); }
+.hero .lead p { margin: 0 0 8px; font-size: 15px; }
+.hero .lead p:last-child { margin-bottom: 0; }
+.chip {
+  font-size: 12.5px; padding: 3px 11px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--muted);
+}
+
+/* ---------------- 目录 ---------------- */
+.toc {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--tint);
+  padding: 15px 19px; margin-bottom: 24px;
+}
+.toc-t {
+  font-size: 12.5px; color: var(--muted); letter-spacing: .06em; margin-bottom: 9px;
+}
+.toc ul { list-style: none; padding: 0; margin: 0; }
+.toc li { margin: 7px 0; }
+.toc a { display: flex; gap: 10px; align-items: baseline; }
+.toc a:hover { text-decoration: none; }
+.toc a:hover .toc-t2 { text-decoration: underline; }
+.toc .tn {
+  flex: none; width: 20px; height: 20px; border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--accent);
+  font-size: 12px; font-weight: 600; line-height: 19px; text-align: center;
+}
+.toc .toc-t2 { font-size: 14.5px; color: var(--fg); }
+.toc .tc { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+/* ---------------- 左侧固定目录（宽屏） ----------------
+   宽屏时把目录从正文顶部挪到左边固定住，读到哪儿都能直接跳到别的章节。
+   窄屏放不下侧栏，退回正文顶部那一份 —— 两份目录在 DOM 里都在，靠媒体查询
+   保证任何宽度下**只有一份可见**。纯 CSS，不依赖 JS。
+
+   侧栏只能放在 `.view-rich` 里：文字版的锚点前缀是 `p-`，侧栏若在视图外面、
+   链接却写 `#sec-N`，切到文字版就成了点了没反应的死链。放在里面则随视图一起
+   显隐 —— 这正是想要的。 */
+.toc-side { display: none; }
+@media (min-width: 1320px) {
+  .toc-side {
+    display: block; position: fixed; z-index: 5;
+    top: 24px; left: max(16px, calc(50% - 636px));
+    width: 216px; max-height: calc(100vh - 48px);
+    overflow-y: auto; margin-bottom: 0;
+  }
+  .toc-inline { display: none; }
+}
+/* 点目录跳过去之后，给落地的那一节一个可见的边 —— 否则读者不知道自己跳到了哪儿。 */
+section.card:target { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+
+/* ---------------- 板块卡片 ---------------- */
+section[id] { scroll-margin-top: 16px; }
+.card {
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 20px 14px; margin-bottom: 22px;
+}
+.sec-head { display: flex; align-items: center; gap: 11px; margin: 0 0 12px; }
+.sec-num {
+  flex: none; width: 30px; height: 30px; border-radius: 9px;
+  background: var(--accent); color: #fff; font-size: 15px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.sec-title { font-size: 18.5px; font-weight: 600; line-height: 1.4; }
+.sec-count { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+/* ---------------- 条目 ---------------- */
+.entry { padding: 15px 0 4px; border-top: 1px dashed var(--line); }
+.entry:first-of-type { border-top: 0; padding-top: 2px; }
+.entry-head { margin: 0 0 9px; font-size: 16.5px; line-height: 1.55; font-weight: 600; }
+.entry-head .idx {
+  display: inline-block; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 5px; background: var(--tint); border: 1px solid var(--line);
+  color: var(--muted); font-size: 11.5px; font-weight: 600;
+  line-height: 17px; text-align: center; vertical-align: 2px; margin-right: 7px;
+}
+.entry-head .vendor { color: var(--accent); }
+.entry-head .etitle { font-weight: 500; }
+.entry-head .dash { color: var(--muted); font-weight: 400; }
+.rbadge {
+  display: inline-block; padding: 2px 12px; border-radius: 999px;
+  background: var(--tint); border: 1px solid var(--line);
+  color: var(--accent); font-size: 14px; font-weight: 600;
+}
+.pts { list-style: none; padding: 0; margin: 0 0 4px; }
+.pts li { position: relative; padding-left: 17px; margin: 7px 0; }
+.pts li::before {
+  content: ""; position: absolute; left: 3px; top: .68em;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--muted); opacity: .55;
+}
+.entry .src {
+  margin: 12px 0 0; padding-top: 9px; border-top: 1px dotted var(--line);
+  font-size: 13px; color: var(--muted); line-height: 1.9;
+}
+.entry .src .lbl { font-weight: 600; color: var(--muted); }
+.entry .feat {
+  margin: 11px 0 2px; padding: 10px 14px;
+  border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+  background: var(--accent-soft); font-size: 14.5px;
+}
+.entry .feat .lbl { color: var(--accent); font-weight: 700; margin-right: 6px; }
+
+/* ---------------- 板块五：建议 ---------------- */
+.advice { list-style: none; padding: 0; margin: 0; counter-reset: adv; }
+.advice li {
+  counter-increment: adv; position: relative;
+  padding: 13px 0 13px 40px; border-top: 1px dashed var(--line);
+}
+.advice li:first-child { border-top: 0; }
+.advice li::before {
+  content: counter(adv); position: absolute; left: 0; top: 13px;
+  width: 25px; height: 25px; border-radius: 8px;
+  background: var(--tint); border: 1px solid var(--line); color: var(--accent);
+  font-size: 13px; font-weight: 700; line-height: 24px; text-align: center;
+}
+.advice .adv-lead { margin: 0 0 6px; font-weight: 600; font-size: 15.5px; }
+.advice p { margin: 0; }
+.signoff {
+  margin: 14px 0 0; padding-top: 10px; border-top: 1px dotted var(--line);
+  color: var(--muted); font-size: 12.5px;
+}
+
+@media (max-width: 520px) {
+  .wrap { padding: 16px 15px 56px; }
+  .archive li { flex-direction: column; gap: 2px; }
+  .card { padding: 15px 15px 11px; }
+  .hero { padding: 18px 16px 15px; }
+  .hero h1 .h1b { font-size: 23px; margin-left: 8px; }
+  .sec-count { display: none; }
+  .toc .tc { display: none; }
+  .entry-head { font-size: 15.5px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="top"><span class="disabled">← 上一期</span><span>往期归档</span><span class="disabled">下一期 →</span></nav>
+<div class="ctrls"><button type="button" class="themebtn" id="themebtn" hidden>深色</button></div><h1>储能结构周报 · 往期归档</h1>
+<p class="sub">共 1 期 ｜ 最新一期 2026-10-12</p>
+<ul class="archive">
+<li><a class="d" href="2026-10-12.html">2026-10-12</a><span class="sub">[行业资讯] 储能结构周报（2026-10-12） ｜ 16 条</span></li>
+</ul>
+<footer>本页由脚本自动生成 ｜ 每期报告都会自动出现在这里</footer>
+</div>
+</body>
+</html>
