@@ -127,6 +127,83 @@
         "https://www.eurekalert.org/news-releases/1129449"
       ],
       "pushed": "2026-10-12"
+    },
+    {
+      "title": "BLUETTI —— AORA 200 V2 在 2kWh 级实现容量增加与重量下降",
+      "urls": [
+        "https://www.itmedia.co.jp/pcuser/articles/2610/14/news063.html",
+        "https://www.oricon.co.jp/pressrelease/3033819/"
+      ],
+      "pushed": "2026-10-19"
+    },
+    {
+      "title": "Anker SOLIX —— S5000 将便携电源转为带轮的 5kWh 级家庭备电设备",
+      "urls": [
+        "https://pv-magazine-usa.com/2026/10/13/anker-solix-announces-wheeled-power-station-with-4-5-kw-output/",
+        "https://www.notebookcheck-cn.com/Anker-Solix-S5000-5kWh-99.1421916.0.html"
+      ],
+      "pushed": "2026-10-19"
+    },
+    {
+      "title": "Zendure —— SolarFlow 2400 AC+ 与 2400 Pro 进入英国插电式光储市场",
+      "urls": [
+        "https://finance.yahoo.com/energy/articles/zendure-brings-plug-solar-uk-113100458.html",
+        "https://www.nationalworld.com/must-read/zendure-launches-plug-in-solar-range-in-uk-following-rule-changes-9289773"
+      ],
+      "pushed": "2026-10-19"
+    },
+    {
+      "title": "CARKU —— PB-102 以 16.5kg 进入 2kWh 轻量便携电源区间",
+      "urls": [
+        "https://aapnews.aap.com.au/aapreleases/cision20261014AE70610",
+        "https://www.car-ku.com/products/1kwh-2200w-power-station-2kwh.html"
+      ],
+      "pushed": "2026-10-19"
+    },
+    {
+      "title": "CARKU —— PB-120、PB-122 以车辆应急启动功能细分轻量产品层级",
+      "urls": [
+        "https://aapnews.aap.com.au/aapreleases/cision20261014AE70610",
+        "https://www.car-ku.com/products/1kwh-2200w-power-station-2kwh.html"
+      ],
+      "pushed": "2026-10-19"
+    },
+    {
+      "title": "Goal Zero —— Yeti 1500 以 IPX4 与快速充电强化户外耐候便携",
+      "urls": [
+        "https://goalzero.com/fr-ca/collections/new-products"
+      ],
+      "pushed": "2026-10-19"
+    },
+    {
+      "title": "Exide Technologies —— Solition Powerflex 将 261kWh 电池与 125kW PCS 集成进户外柜",
+      "urls": [
+        "https://www.pv-magazine.com/2026/10/13/exide-launches-modular-125-kw-261-kwh-battery-for-ci-applications/"
+      ],
+      "pushed": "2026-10-19"
+    },
+    {
+      "title": "Hithium —— N785Ah 钠离子电芯配套 4MWh 系统进入验证阶段",
+      "urls": [
+        "https://cn.solarbe.com/news/20261016/50030502.html",
+        "https://www.ess-news.com/2026/10/06/interview-hithiums-sodium-ion-storage-push-where-it-could-win-where-it-wont-and-path-to-bankability/"
+      ],
+      "pushed": "2026-10-19"
+    },
+    {
+      "title": "巨湾技研（Greater Bay Technology） —— 既有 4GWh 液态锂电产线改造为全固态电池产线",
+      "urls": [
+        "https://autonews.gasgoo.com/articles/market-industry/greater-bay-technology-commissions-gwh-scale-all-solid-state-battery-production-line-2110549317063766016",
+        "https://www.electrive.com/2026/10/14/gbt-begins-series-production-of-solid-state-battery-cells/"
+      ],
+      "pushed": "2026-10-19"
+    },
+    {
+      "title": "Great Power —— Fengpeng 587Ah 储能电芯进入量产交付阶段",
+      "urls": [
+        "https://www.energytrend.com/news/20261015-52292.html"
+      ],
+      "pushed": "2026-10-19"
     }
   ]
 }
