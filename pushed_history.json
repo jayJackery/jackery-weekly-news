@@ -204,6 +204,63 @@
         "https://www.energytrend.com/news/20261015-52292.html"
       ],
       "pushed": "2026-10-19"
+    },
+    {
+      "title": "EcoFlow —— DELTA Gen4 在 3kWh 级引入明显的体积与重量压缩",
+      "urls": [
+        "https://jp.ecoflow.com/products/delta-3000-gen4-portable-power-station",
+        "https://kaden.watch.impress.co.jp/docs/news/2150125.html",
+        "https://www.itmedia.co.jp/pcuser/articles/2610/23/news056.html"
+      ],
+      "pushed": "2026-10-26"
+    },
+    {
+      "title": "DJI Power —— Power Auro 2000 Elite 将充电模块内置到 2kWh 级机身",
+      "urls": [
+        "https://post.smzdm.com/p/am933xev/",
+        "https://www.teltarif.de/dji-powerstation-vorbestelleraktion/news/107000.html"
+      ],
+      "pushed": "2026-10-26"
+    },
+    {
+      "title": "Anker SOLIX —— S5000 用带轮 5kWh 机身切入家庭备电",
+      "urls": [
+        "https://www.desmoinesregister.com/press-release/story/137375/anker-introduces-the-anker-solix-s5000-the-longest-lasting-5kwh-portable-power-station/",
+        "https://www.ess-news.com/2026/10/09/anker-solix-announces-s5000-power-station-with-4-5-kw-output/"
+      ],
+      "pushed": "2026-10-26"
+    },
+    {
+      "title": "Hoymiles —— HoyUltra 2,000M 将 2MWh 级工商业储能做成集成式液冷集装箱",
+      "urls": [
+        "https://www.pv-magazine-australia.com/2026/10/26/hoymiles-releases-2000-kwh-ci-energy-storage-solution/"
+      ],
+      "pushed": "2026-10-26"
+    },
+    {
+      "title": "Sineng Electric —— 430kW 液冷构网型组串 PCS 降低热管理辅助功耗",
+      "urls": [],
+      "pushed": "2026-10-26"
+    },
+    {
+      "title": "Sungrow —— PowerTitan 3.0 通过 UL 9540A:2026 大规模火灾测试",
+      "urls": [],
+      "pushed": "2026-10-26"
+    },
+    {
+      "title": "Dow —— VOLTRICELL 将电芯材料、热防护泡沫和壳体陶瓷化涂层放进同一平台",
+      "urls": [
+        "https://chargedevs.com/newswire/dow-launches-voltricell-platform-of-binders-dispersants-and-additives-for-battery-cells/",
+        "https://finance.eastmoney.com/a/202610123892883182.html"
+      ],
+      "pushed": "2026-10-26"
+    },
+    {
+      "title": "研究团队 —— 钠基固态结构电池把储能单元兼作 CFRP 加固件",
+      "urls": [
+        "https://link.springer.com/article/10.1007/s11709-026-1345-1"
+      ],
+      "pushed": "2026-10-26"
     }
   ]
 }
