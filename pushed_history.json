@@ -261,6 +261,84 @@
         "https://link.springer.com/article/10.1007/s11709-026-1345-1"
       ],
       "pushed": "2026-10-26"
+    },
+    {
+      "title": "BLUETTI —— Apex 200 将 2.56kWh 便携电源压缩至 27kg 级",
+      "urls": [
+        "https://en.best-batteries.com/product-launches/",
+        "https://www.ess-news.com/2026/10/23/bluetti-launching-apex-200-with-2-56-kwh-capacity-and-a-huge-drop-in-size-and-weight-from-apex-300/"
+      ],
+      "pushed": "2026-11-02"
+    },
+    {
+      "title": "DJI Power —— Power Auro 2000 Elite 将充电模块内置到约 19kg 的 2kWh 机身",
+      "urls": [
+        "https://www.prnewswire.com/news-releases/new-dji-power-auro-2000-elite-packs-car-charging-and-solar-benefits-into-djis-most-compact-2kwh-power-station-302923109.html",
+        "https://www.pv-magazine.com/2026/10/29/dji-power-launches-new-auro-2000-elite-as-its-most-compact-2-kwh-power-station/"
+      ],
+      "pushed": "2026-11-02"
+    },
+    {
+      "title": "Hoymiles —— HiOne 在澳大利亚展出 8–64kWh 可堆叠家储架构",
+      "urls": [
+        "https://www.aap.com.au/aapreleases/cision20261029ae84505/",
+        "https://www.hoymiles.com/product-release.html"
+      ],
+      "pushed": "2026-11-02"
+    },
+    {
+      "title": "Hoymiles —— HoyUltra 2,000M 将 2MWh 级工商业储能集成进液冷集装箱",
+      "urls": [
+        "http://www.pv-magazine.com/2026/10/21/hoymiles-releases-a-2000-kwh-ci-energy-storage-solution/"
+      ],
+      "pushed": "2026-11-02"
+    },
+    {
+      "title": "CATL —— TENER+ 以 9MWh 单系统容量压缩集装箱数量和场站占地",
+      "urls": [
+        "https://www.energy-storage.news/catl-holds-global-launch-for-9mwh-tener-bess-at-all-energy-australia-signs-pcs-agreement-with-hitachi-energy/"
+      ],
+      "pushed": "2026-11-02"
+    },
+    {
+      "title": "Sineng Electric —— 液冷组串 PCS 将构网型控制与热管理集成",
+      "urls": [],
+      "pushed": "2026-11-02"
+    },
+    {
+      "title": "TCL Sunpower —— X5 以预装配混合柜降低现场接线量",
+      "urls": [
+        "https://www.pv-magazine.com/2026/10/22/tcl-sunpower-launches-hybrid-energy-storage-cabinet-for-ci-applications/"
+      ],
+      "pushed": "2026-11-02"
+    },
+    {
+      "title": "Jinko ESS —— Tera 镜像柜布局将占地和直流线缆进一步压缩",
+      "urls": [],
+      "pushed": "2026-11-02"
+    },
+    {
+      "title": "Dow —— VOLTRICELL 将电芯材料与热防护材料放入统一平台",
+      "urls": [
+        "https://finance.yahoo.com/technology/articles/dow-launches-voltricell-battery-cell-materials-platform-121500783.html",
+        "https://rubberworld.com/dow-launches-voltricell-battery-cell-materials-platform/"
+      ],
+      "pushed": "2026-11-02"
+    },
+    {
+      "title": "PACT —— Thermo Shield 通过薄层电芯包覆抑制热失控传播",
+      "urls": [
+        "https://patch.com/new-york/new-york-city/ct-manufacturer-shines-national-battery-industry-forum-detroit"
+      ],
+      "pushed": "2026-11-02"
+    },
+    {
+      "title": "CATL —— 钠离子电芯继续以低温性能换取较低能量密度",
+      "urls": [
+        "https://www.energy-storage.news/catl-holds-global-launch-for-9mwh-tener-bess-at-all-energy-australia-signs-pcs-agreement-with-hitachi-energy/",
+        "https://www.iea.org/commentaries/sodium-ion-battery-momentum-grows-but-challenges-remain"
+      ],
+      "pushed": "2026-11-02"
     }
   ]
 }
