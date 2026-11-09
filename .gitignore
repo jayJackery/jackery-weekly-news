@@ -43,3 +43,9 @@ desktop.ini
 # 它**不是**给复刻者看的，所以和上面那份一样刻意不进仓库 —— 仓库是公开的。
 # 将来若要把它也公开，删掉下面这两行即可。
 资讯简介.md
+
+# ---- 无人值守运行的本机产物，不进公开仓库 ----
+# logs/ 是每次运行的日志与投递标记；inbox/_preview-* 是 dry-run 生成的排版预览。
+logs/
+inbox/_preview-*.md
+inbox/_preview-*.html

@@ -26,6 +26,7 @@ OpenRouter 上的 sonar 系列本身就会联网检索，检索与撰写在一�
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import logging
@@ -177,6 +178,24 @@ DEFAULT_SITE_BASE_URL = "https://jayJackery.github.io/jackery-weekly-news"
 # 归档首页与当期页面的文件名形状。写成常量是为了和 workflow 里的白名单正则保持一致 ——
 # 两处一旦漂移，CI 会因为"暂存区出现白名单外的路径"而硬失败。
 SITE_INDEX_NAME = "index.html"
+
+# ---------------------------------------------------------------------------
+# 预置稿（inbox）
+# ---------------------------------------------------------------------------
+# 2026-11-09 起，报告不再必须由 OpenRouter 现写：把当天的正文预置到
+# `inbox/<YYYY-MM-DD>.md`，`main.py` 就跳过模型调用，只在本地跑过滤、校验、
+# 摘要、推送、落站、记账。**下游一行没变**，所以 workflow 也不需要改。
+#
+# 为什么用文件而不是环境变量：`weekly.yml` 在 Windows 上被透明加密
+# （文件头 `%TSD-Header-###%`），改它要绕 git 底层；而"某天的稿子就在这个路径上"
+# 是最直白的表达 —— 文件名带日期，不存在"昨天的稿被今天复用"的可能。
+#
+# ⚠️ 稿子只放**正文**（从 `## 一、` 开始），不要自己写一级标题和"覆盖周期"那行：
+# 那是本地生成的，关键词 `[行业资讯]` 必须稳定出现在它里面（硬性约束 1）。
+#
+# ⚠️ 找不到当天的稿、又没有可用的 OpenRouter key 时，必须**非 0 退出**。
+# 不要写成"没稿就跳过这一期" —— 那正是这个项目最怕的静默失败。
+INBOX_DIR = Path(__file__).resolve().parent / "inbox"
 
 # ---------------------------------------------------------------------------
 # 促销稿过滤
@@ -861,8 +880,13 @@ def build_user_prompt(
 # 环境变量
 # ---------------------------------------------------------------------------
 
-def load_config(dry_run: bool) -> dict[str, str]:
-    """读取并校验环境变量。缺什么、去哪配，一次性说清楚再退出。"""
+def load_config(dry_run: bool, require_api_key: bool = True) -> dict[str, str]:
+    """读取并校验环境变量。缺什么、去哪配，一次性说清楚再退出。
+
+    `require_api_key=False` 用于**预置稿模式**：那一期不调 OpenRouter，
+    所以缺 key 不该拦住推送。⚠️ 默认仍是 True —— 只有确定要用现写稿时才传 False，
+    否则"忘了配 key"会变成跑到一半才 401，比启动时报错难查得多。
+    """
     missing: list[str] = []
 
     # 优先 OPENROUTER_API_KEY（名字准确），兼容旧名 PERPLEXITY_API_KEY ——
@@ -872,7 +896,7 @@ def load_config(dry_run: bool) -> dict[str, str]:
         or os.environ.get("PERPLEXITY_API_KEY")
         or ""
     ).strip()
-    if not api_key:
+    if not api_key and require_api_key:
         missing.append(
             "OPENROUTER_API_KEY —— OpenRouter 控制台的 API Key（sk-or-v1- 开头）。\n"
             "    本地：加进项目根目录的 Key 文件；线上：仓库 Settings → Secrets → Actions"
@@ -1423,13 +1447,61 @@ def build_report(
     if repeated:
         LOG.info("板块二~五剔除跨周重复条目 %d 条", len(repeated))
 
+    body = f"{section1}\n\n{rest}"
+    return _finalize_report(body, today, citations)
+
+
+def find_inbox_report(today: datetime) -> Path | None:
+    """当天有没有预置稿。**文件名锁死日期**，避免昨天的稿被今天复用。
+
+    加上 `latest.md` 之类的兜底会让"忘了写稿"变成"重发上一期"，那是静默的内容
+    错误；所以只认 `<YYYY-MM-DD>.md`，找不到就走 OpenRouter（没 key 就非 0 退出）。
+    """
+    path = INBOX_DIR / f"{today.strftime('%Y-%m-%d')}.md"
+    return path if path.is_file() else None
+
+
+def assemble_report(
+    text: str, today: datetime, history: list[dict] | None = None
+) -> tuple[str, list[str]]:
+    """把外部写好的正文过一遍与 `build_report()` **完全相同**的本地链路。
+
+    ⚠️ **必须真的再过滤一遍，不能拿来就用。** 预置稿同样是"人/模型写的"，
+    照样会混进折扣稿和上期条目；而台账就在本机，没有理由跳过。何况这条路
+    不经过 `build_report`，这两道过滤是它唯一的网 —— 跳过就等于把"促销稿混进
+    板块一"（踩过两次）重新打开。
+    """
+    seen = seen_url_map(history or [])
+    body = strip_model_heading(text)
+    # 安全网：板块一的标题由本地定位，稿子里漏了就补上，否则层级会乱。
+    if SECTION1_HEADING not in body:
+        LOG.warning("预置稿里没有 %r，已补上标题", SECTION1_HEADING)
+        body = f"{SECTION1_HEADING}\n\n{body}"
+
+    body, banned = drop_promo_blocks(body, "预置稿")
+    if banned:
+        LOG.info("预置稿剔除促销条目 %d 条", len(banned))
+    body, repeated = drop_repeat_blocks(body, "预置稿", seen)
+    if repeated:
+        LOG.info("预置稿剔除跨周重复条目 %d 条", len(repeated))
+
+    # 预置稿没有 citations（那是模型响应里的字段），传空列表让兜底分支自然跳过。
+    return _finalize_report(body, today, [])
+
+
+def _finalize_report(
+    body: str, today: datetime, citations: list[str]
+) -> tuple[str, list[str]]:
+    """正文 → 最终报告。**两条来源（模型现写 / 预置稿）共用这一份实现。**
+
+    header 的关键词与覆盖周期、五板块齐全校验都在这里，所以两条来源过的是
+    同一道闸门 —— 不存在"预置稿少查一项"的可能。
+    """
     start, end = _window(today)          # 唯一来源，别在这里重算
     header = (
         f"# {DINGTALK_KEYWORD} 储能结构周报（{today.strftime('%Y-%m-%d')}）\n\n"
         f"> 覆盖周期：{start} ~ {end} ｜ 面向储能结构工程师\n\n"
     )
-
-    body = f"{section1}\n\n{rest}"
 
     # 安全网：模型偶尔会忘掉正文里的链接。它自己返回的 citations 是真实检索结果，
     # 拿来补一段参考来源，总好过整份报告一个可点的链接都没有。
@@ -1631,14 +1703,23 @@ footer {
 
 /* ---------------- 报告头 ---------------- */
 .hero {
-  background: var(--tint); border: 1px solid var(--line); border-radius: 14px;
-  padding: 22px 22px 18px; margin-bottom: 20px;
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, var(--tint), var(--bg) 72%);
+  border: 1px solid var(--line); border-radius: 18px;
+  padding: 28px 26px 22px; margin-bottom: 24px;
+  box-shadow: 0 8px 28px rgba(31,35,40,.045);
+}
+.hero::after {
+  content: ""; position: absolute; width: 180px; height: 180px; right: -55px; top: -75px;
+  border: 1px solid var(--line); border-radius: 50%; opacity: .55;
+  box-shadow: 0 0 0 22px var(--bg), 0 0 0 23px var(--line), 0 0 0 48px var(--bg), 0 0 0 49px var(--line);
+  pointer-events: none;
 }
 .hero .kicker {
   font-size: 12.5px; font-weight: 600; letter-spacing: .1em;
   color: var(--accent); margin-bottom: 6px;
 }
-.hero h1 { margin: 0 0 14px; line-height: 1.3; }
+.hero h1 { position: relative; z-index: 1; margin: 0 0 14px; line-height: 1.3; }
 .hero h1 .h1a { font-size: 19px; font-weight: 500; }
 .hero h1 .h1b {
   font-size: 27px; font-weight: 700; margin-left: 10px;
@@ -1699,10 +1780,12 @@ section.card:target { border-color: var(--accent); box-shadow: 0 0 0 3px var(--a
 /* ---------------- 板块卡片 ---------------- */
 section[id] { scroll-margin-top: 16px; }
 .card {
-  border: 1px solid var(--line); border-radius: 12px;
-  padding: 18px 20px 14px; margin-bottom: 22px;
+  border: 1px solid var(--line); border-radius: 16px;
+  padding: 21px 22px 17px; margin-bottom: 24px;
+  background: color-mix(in srgb, var(--bg) 94%, var(--tint));
+  box-shadow: 0 5px 20px rgba(31,35,40,.035);
 }
-.sec-head { display: flex; align-items: center; gap: 11px; margin: 0 0 12px; }
+.sec-head { display: flex; align-items: center; gap: 11px; margin: 0 0 17px; padding-bottom: 13px; border-bottom: 1px solid var(--line-2); }
 .sec-num {
   flex: none; width: 30px; height: 30px; border-radius: 9px;
   background: var(--accent); color: #fff; font-size: 15px; font-weight: 600;
@@ -1712,17 +1795,22 @@ section[id] { scroll-margin-top: 16px; }
 .sec-count { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 
 /* ---------------- 条目 ---------------- */
-.entry { padding: 15px 0 4px; border-top: 1px dashed var(--line); }
-.entry:first-of-type { border-top: 0; padding-top: 2px; }
-.entry-head { margin: 0 0 9px; font-size: 16.5px; line-height: 1.55; font-weight: 600; }
+.entry {
+  padding: 17px 18px 15px; margin: 13px 0 0;
+  border: 1px solid var(--line-2); border-left: 3px solid var(--accent);
+  border-radius: 11px; background: var(--bg);
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.entry:hover { border-color: var(--line); box-shadow: 0 7px 22px rgba(31,35,40,.065); transform: translateY(-1px); }
+.entry-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin: 0 0 11px; font-size: 16.5px; line-height: 1.55; font-weight: 600; }
 .entry-head .idx {
   display: inline-block; min-width: 18px; height: 18px; padding: 0 5px;
   border-radius: 5px; background: var(--tint); border: 1px solid var(--line);
   color: var(--muted); font-size: 11.5px; font-weight: 600;
   line-height: 17px; text-align: center; vertical-align: 2px; margin-right: 7px;
 }
-.entry-head .vendor { color: var(--accent); }
-.entry-head .etitle { font-weight: 500; }
+.entry-head .vendor { color: var(--accent); display: inline-block; padding: 1px 8px; border-radius: 6px; background: var(--accent-soft); font-size: 13px; letter-spacing: .02em; }
+.entry-head .etitle { font-weight: 600; }
 .entry-head .dash { color: var(--muted); font-weight: 400; }
 .rbadge {
   display: inline-block; padding: 2px 12px; border-radius: 999px;
@@ -1746,6 +1834,8 @@ section[id] { scroll-margin-top: 16px; }
   background: var(--accent-soft); font-size: 14.5px;
 }
 .entry .feat .lbl { color: var(--accent); font-weight: 700; margin-right: 6px; }
+.entry .src a { display: inline-block; margin: 1px 3px 1px 0; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--tint); font-size: 12px; }
+.entry .src a:hover { border-color: var(--accent); text-decoration: none; }
 
 /* ---------------- 板块五：建议 ---------------- */
 .advice { list-style: none; padding: 0; margin: 0; counter-reset: adv; }
@@ -1770,8 +1860,9 @@ section[id] { scroll-margin-top: 16px; }
 @media (max-width: 520px) {
   .wrap { padding: 16px 15px 56px; }
   .archive li { flex-direction: column; gap: 2px; }
-  .card { padding: 15px 15px 11px; }
-  .hero { padding: 18px 16px 15px; }
+  .card { padding: 15px 13px 12px; }
+  .entry { padding: 14px 13px 12px; }
+  .hero { padding: 19px 16px 16px; }
   .hero h1 .h1b { font-size: 23px; margin-left: 8px; }
   .sec-count { display: none; }
   .toc .tc { display: none; }
@@ -1886,9 +1977,14 @@ def _inline_text(raw: str) -> str:
 
 
 def _anchor(url: str, label: str) -> str:
+    # GoatCounter 的点击事件用 URL 短哈希区分原文链接，不把完整目标 URL
+    # 作为事件名上传；页面配置统计编号后即可在后台按链接标签查看点击量。
+    event_id = hashlib.sha256(url.encode("utf-8")).hexdigest()[:12]
     return (
         f'<a href="{html.escape(url, quote=True)}" target="_blank" '
-        f'rel="noopener noreferrer">{_inline_text(label)}</a>'
+        f'rel="noopener noreferrer" data-goatcounter-click="source-{event_id}" '
+        f'data-goatcounter-title="{html.escape(label[:180], quote=True)}">'
+        f'{_inline_text(label)}</a>'
     )
 
 
@@ -2074,6 +2170,18 @@ def _page_shell(
         # 归档页不输出 radio，也不挂 .has-toggle —— 整页正常显示，不会被藏起来。
         radios = ""
         switch = ""
+    # GoatCounter 站点编号是公开标识，不是密钥；由仓库变量配置。
+    # 未设置时不加载统计脚本，页面和所有外链照常工作。
+    analytics_code = os.environ.get("GOATCOUNTER_CODE", "").strip()
+    analytics_script = ""
+    if analytics_code:
+        if not re.fullmatch(r"[A-Za-z0-9-]+", analytics_code):
+            raise ValueError("GOATCOUNTER_CODE 只能包含英文字母、数字和连字符")
+        analytics_script = (
+            f'<script data-goatcounter="https://{analytics_code}.goatcounter.com/count" '
+            'async src="https://gc.zgo.at/count.js"></script>'
+        )
+        footer += " ｜ 访问统计由 GoatCounter 提供"
     # ⚠️ `radio → .ctrls → .view` 的兄弟顺序不能变，CSS 用的是 `~`。
     # 配色按钮两个页面都有（在单期页选了深色，跳回归档不该变回浅色）。
     body = (
@@ -2089,6 +2197,7 @@ def _page_shell(
 <meta name="color-scheme" content="light dark">
 <title>{html.escape(title)}</title>
 <script>{_THEME_SCRIPT}</script>
+{analytics_script}
 <style>{_PAGE_CSS}</style>
 </head>
 <body>
@@ -2897,6 +3006,9 @@ def main() -> int:
     parser.add_argument("--alert-failure", action="store_true",
                         help="只在 workflow 失败时由 CI 调用：往钉钉发一条失败告警。"
                              "不读 Key、不校验其它配置、不写任何文件")
+    parser.add_argument("--from-report", default="", metavar="PATH",
+                        help="用指定的 Markdown 正文替代模型现写（正文从 `## 一、` 开始）。"
+                             "不给时自动查找 inbox/<当天日期>.md；都找不到才调 OpenRouter")
     args = parser.parse_args()
 
     # Windows 上输出被重定向（管道 / VSCode 集成终端 / Git Bash）时，Python 会按
@@ -2930,9 +3042,16 @@ def main() -> int:
         LOG.info("已重建 %d 个网页 → %s", len(written), DOCS_DIR)
         return 0
 
-    cfg = load_config(dry_run=args.dry_run)
+    # 时间与稿源先定，再读配置：**要不要 API key 取决于有没有预置稿**。
+    # 顺序反过来的话，预置稿模式下会先因为"缺 OPENROUTER_API_KEY"退出 ——
+    # 而 OpenRouter 恰恰是余额耗尽后最可能被删掉的那个变量。
     today = datetime.now(BEIJING_TZ)
     date_str = today.strftime("%Y-%m-%d")
+    inbox = Path(args.from_report) if args.from_report else find_inbox_report(today)
+    if args.from_report and not inbox.is_file():
+        sys.exit(f"❌ --from-report 指向的文件不存在：{inbox}")
+
+    cfg = load_config(dry_run=args.dry_run, require_api_key=inbox is None)
     base_url = cfg["SITE_BASE_URL"]
     if not base_url:
         # ⚠️ 必须显式告警。否则一个配错的变量会让网页功能**静默退回**旧行为，
@@ -2943,9 +3062,15 @@ def main() -> int:
     # 带时区的 datetime 和 naive date 相减会抛 TypeError，第一天就崩。
     history = load_history(HISTORY_PATH, today.date())
 
-    LOG.info("调用 OpenRouter（%s）检索并撰写中……共 3 次：板块一两轮 + 其余板块一轮",
-             cfg["OPENROUTER_MODEL"])
-    report, citations = build_report(cfg, today, history)
+    if inbox is not None:
+        LOG.info("使用预置稿 %s：跳过 OpenRouter 调用，本地照跑过滤/校验/推送/落站", inbox)
+        report, citations = assemble_report(
+            inbox.read_text(encoding="utf-8-sig"), today, history
+        )
+    else:
+        LOG.info("未找到当天预置稿，回退 OpenRouter（%s）：共 3 次调用，板块一两轮 + 其余板块一轮",
+                 cfg["OPENROUTER_MODEL"])
+        report, citations = build_report(cfg, today, history)
     LOG.info("报告生成完毕：%d 字，%d 个引用链接，%d 字节",
              len(report), len(citations), len(report.encode("utf-8")))
 
@@ -2963,7 +3088,12 @@ def main() -> int:
     # ⚠️ 放在这里而不是 build_digest() 里 —— build_digest 是个纯函数（只吃 report），
     # 让它去发网络请求，就没法单独测它、也没法在不联网时复现出同一份摘要。
     # 查不到（None）就什么都不做，绝不因此中断这一期。
-    balance = check_openrouter_balance(cfg["OPENROUTER_API_KEY"]) if base_url else None
+    # 预置稿模式下可能没有 key（余额耗尽后它常被删掉），那就没有余额可查 ——
+    # 直接跳过，不要让一句"附加信息"在这条路径上制造异常。
+    balance = (
+        check_openrouter_balance(cfg["OPENROUTER_API_KEY"])
+        if base_url and cfg["OPENROUTER_API_KEY"] else None
+    )
     if balance is not None:
         # 余额每期都打一行日志（与阈值无关）：出问题时日志是唯一的事后依据，
         # 而余额是"这周为什么 402 了"最直接的答案。
