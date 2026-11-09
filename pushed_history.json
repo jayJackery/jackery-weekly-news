@@ -384,51 +384,6 @@
         "https://www.ise.fraunhofer.de/en/press-media.html"
       ],
       "pushed": "2026-11-09"
-    },
-    {
-      "title": "Conow —— 6 kWh 插电式 AC 家储，把逆变器热量与电芯做成物理隔离",
-      "urls": [
-        "https://www.conow.com/products/atlas-6000-ac-plugin-home-battery",
-        "https://www.globenewswire.com/de/news-release/2026/10/26/3387863/0/en/conow-launches-award-winning-atlas-6000-ac-in-germany-advancing-ai-driven-home-energy-management.html"
-      ],
-      "pushed": "2026-11-09"
-    },
-    {
-      "title": "Outer Spaces —— 把 LFP 电池做成户外凉亭的地板",
-      "urls": [
-        "https://www.ess-news.com/2026/10/29/outer-space-debuts-solar-pavilion-with-hidden-battery-storage-decking/",
-        "https://www.pv-magazine.it/2026/11/03/outer-space-debuts-solar-pavilion-with-hidden-battery-storage-decking/"
-      ],
-      "pushed": "2026-11-09"
-    },
-    {
-      "title": "EDENenergy（Fraunhofer ISE 分拆） —— 112 块退役滑板车电池拼出 70 kWh 工商业储能",
-      "urls": [
-        "https://www.ise.fraunhofer.de/en/press-media/press-releases/2026/startup-edenenergy-used-escooter-batteries-become-industrial-storage-system.html"
-      ],
-      "pushed": "2026-11-09"
-    },
-    {
-      "title": "Solis（锦浪） —— FlexAIO 堆叠式户用一体机，2027 Q1 首批交付",
-      "urls": [
-        "https://solarmagazine.nl/nieuws-zonne-energie/i45292/nieuwe-all-in-one-thuisbatterij-flexaio-van-solis-stuurt-met-ai-automatisch-op-stroomkosten-en-productie-zonnepanelen"
-      ],
-      "pushed": "2026-11-09"
-    },
-    {
-      "title": "Revolta —— 德国首套 10 kWh 钠离子户用电池投运",
-      "urls": [
-        "https://www.ess-news.com/2026/11/05/revolta-installs-first-10-kwh-sodium-ion-home-battery-in-germany/",
-        "https://www.pv-magazine.fr/2026/11/06/revolta-installe-sa-premiere-batterie-residentielle-sodium-ion-de-10-kwh-en-allemagne/"
-      ],
-      "pushed": "2026-11-09"
-    },
-    {
-      "title": "Fraunhofer ISE —— 钠离子电极干法涂布，去溶剂、去 PFAS",
-      "urls": [
-        "https://www.ise.fraunhofer.de/en/press-media.html"
-      ],
-      "pushed": "2026-11-09"
     }
   ]
 }

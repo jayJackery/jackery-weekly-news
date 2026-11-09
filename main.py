@@ -3075,6 +3075,25 @@ def main() -> int:
     # 带时区的 datetime 和 naive date 相减会抛 TypeError，第一天就崩。
     history = load_history(HISTORY_PATH, today.date())
 
+    # ⚠️ 幂等闸门：GitHub 的 schedule 会迟到。
+    # 2026-11-09 实测：周一 09:30 那次 cron 迟到近 7 小时，16:25 才补跑；
+    # 补跑照常走完推送，群里就收到两条一模一样的消息，台账也被写了两遍（51→57）。
+    # 判据用 docs/<日期>.md —— 它**只在推送成功之后**才写，所以它的存在同时证明"已推过"；
+    # 台账里已有今日条目是等价证据（覆盖 docs 被手工清掉的情况）。
+    # dry-run 不拦：本地反复试排版正是它的用途。
+    allow_republish = os.environ.get("ALLOW_REPUBLISH", "").strip().lower() in {"1", "true", "yes"}
+    if not args.dry_run and not allow_republish:
+        already = (DOCS_DIR / f"{date_str}.md").is_file() or any(
+            e.get("pushed") == date_str for e in history
+        )
+        if already:
+            LOG.warning(
+                "本期 %s 已发布过：跳过重复推送（docs 已存在或台账已有今日条目）。"
+                "确需重发请显式设 ALLOW_REPUBLISH=1",
+                date_str,
+            )
+            return 0
+
     if inbox is not None:
         LOG.info("使用预置稿 %s：跳过 OpenRouter 调用，本地照跑过滤/校验/推送/落站", inbox)
         report, citations = assemble_report(
