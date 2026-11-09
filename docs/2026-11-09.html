@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>[行业资讯] 储能结构周报（2026-11-09）</title>
+<script>
+(function(){
+  var K='weekly-theme', root=document.documentElement;
+  try{
+    var s=localStorage.getItem(K);
+    if(s==='dark'||s==='light')root.setAttribute('data-theme',s);
+  }catch(e){}
+  function wire(){
+    var b=document.getElementById('themebtn');
+    if(!b)return;
+    var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+    function cur(){
+      return root.getAttribute('data-theme')||((mq&&mq.matches)?'dark':'light');
+    }
+    function paint(){b.textContent=(cur()==='dark')?'浅色':'深色';}
+    b.addEventListener('click',function(){
+      var next=(cur()==='dark')?'light':'dark';
+      root.setAttribute('data-theme',next);
+      try{localStorage.setItem(K,next);}catch(e){}
+      paint();
+    });
+    b.hidden=false;
+    paint();
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',wire);
+  }else{
+    wire();
+  }
+})();
+</script>
+
+<style>
+:root {
+  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
+  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
+  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  color-scheme: light;
+}
+/* 没有显式选择时跟随系统。`:root:not([data-theme])` 与下面的 `:root[data-theme=…]`
+   特异性相同（都是 0,2,0），所以**顺序决定胜负** —— 显式那两条必须在文档里靠后，
+   否则点了按钮不生效。 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
+    --bg:#0d1117; --code:#161b22; --accent:#f0883e;
+    --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
+  --bg:#0d1117; --code:#161b22; --accent:#f0883e;
+  --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
+  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
+  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 820px; margin: 0 auto; padding: 22px 20px 72px; }
+nav.top {
+  display: flex; gap: 12px; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 26px;
+  font-size: 14px;
+}
+nav.top .disabled { color: var(--muted); }
+h1 { font-size: 23px; line-height: 1.45; margin: 0 0 6px; }
+h2 {
+  font-size: 19px; margin: 38px 0 10px; padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+h3 { font-size: 16.5px; margin: 26px 0 4px; }
+p, li { word-break: break-word; }
+ul, ol { padding-left: 22px; }
+li { margin: 4px 0; }
+blockquote {
+  margin: 0 0 22px; padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--line); color: var(--muted);
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code, pre { background: var(--code); border-radius: 6px; }
+pre { padding: 12px; overflow-x: auto; font-size: 13px; }
+strong { font-weight: 600; }
+footer {
+  margin-top: 52px; padding-top: 16px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 13px;
+}
+.archive { list-style: none; padding: 0; margin: 8px 0 0; }
+.archive li {
+  display: flex; gap: 14px; align-items: baseline;
+  padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.archive .d { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.archive .sub { color: var(--muted); font-size: 13px; }
+.archive .none { color: var(--muted); }
+
+/* ---------------- 图文版 / 文字版 切换（纯 CSS，不用 JS） ----------------
+   兄弟选择器 `~` 要求 radio 必须排在 .view / .vswitch **前面**，且同为 .wrap 的子元素。
+   用 radio 而不是一段 JS：邮件客户端、RSS 阅读器、企业策略下 JS 可能被禁，
+   而这几类正是本报告的读者可能遇到的环境。代价是**选择不会跨页记住**。
+   ⚠️ 这段注释里不要写出尖括号标签名 —— `_PAGE_CSS` 是内联进 `<style>` 的，
+   一旦出现结束标签就会把整个样式块提前截断。见下方 `_theme_script_is_safe` 的守卫。 */
+.vmode { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.has-toggle .view { display: none; }
+.has-toggle #v-rich:checked ~ .view-rich { display: block; }
+.has-toggle #v-plain:checked ~ .view-plain { display: block; }
+/* ⚠️ 控件行必须是 radio 的**后置兄弟**，`~` 才够得到；标签再嵌一层 .vswitch 不影响，
+   但选择器要写成 `~ .ctrls label[…]`，不能写成 `~ .vswitch label[…]`。 */
+.ctrls {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 9px; margin: -10px 0 18px;
+}
+.vswitch { display: flex; }
+.vswitch label {
+  cursor: pointer; font-size: 13px; padding: 5px 14px; user-select: none;
+  border: 1px solid var(--line); color: var(--muted); background: var(--bg);
+}
+.vswitch label:first-of-type { border-radius: 999px 0 0 999px; }
+.vswitch label:last-of-type { border-radius: 0 999px 999px 0; border-left: 0; }
+.has-toggle #v-rich:checked ~ .ctrls label[for="v-rich"],
+.has-toggle #v-plain:checked ~ .ctrls label[for="v-plain"] {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+/* 无 JS 时按钮保持 hidden，不显示一个点了没反应的假按钮。 */
+.themebtn {
+  font: inherit; font-size: 13px; padding: 5px 14px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--bg); color: var(--muted); white-space: nowrap;
+}
+.themebtn:hover { color: var(--fg); border-color: var(--muted); }
+.themebtn[hidden] { display: none; }
+
+/* ---------------- 报告头 ---------------- */
+.hero {
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, var(--tint), var(--bg) 72%);
+  border: 1px solid var(--line); border-radius: 18px;
+  padding: 28px 26px 22px; margin-bottom: 24px;
+  box-shadow: 0 8px 28px rgba(31,35,40,.045);
+}
+.hero::after {
+  content: ""; position: absolute; width: 180px; height: 180px; right: -55px; top: -75px;
+  border: 1px solid var(--line); border-radius: 50%; opacity: .55;
+  box-shadow: 0 0 0 22px var(--bg), 0 0 0 23px var(--line), 0 0 0 48px var(--bg), 0 0 0 49px var(--line);
+  pointer-events: none;
+}
+.hero .kicker {
+  font-size: 12.5px; font-weight: 600; letter-spacing: .1em;
+  color: var(--accent); margin-bottom: 6px;
+}
+.hero h1 { position: relative; z-index: 1; margin: 0 0 14px; line-height: 1.3; }
+.hero h1 .h1a { font-size: 19px; font-weight: 500; }
+.hero h1 .h1b {
+  font-size: 27px; font-weight: 700; margin-left: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.hero .meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.hero .lead { margin-top: 15px; padding-top: 14px; border-top: 1px solid var(--line); }
+.hero .lead p { margin: 0 0 8px; font-size: 15px; }
+.hero .lead p:last-child { margin-bottom: 0; }
+.chip {
+  font-size: 12.5px; padding: 3px 11px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--muted);
+}
+
+/* ---------------- 目录 ---------------- */
+.toc {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--tint);
+  padding: 15px 19px; margin-bottom: 24px;
+}
+.toc-t {
+  font-size: 12.5px; color: var(--muted); letter-spacing: .06em; margin-bottom: 9px;
+}
+.toc ul { list-style: none; padding: 0; margin: 0; }
+.toc li { margin: 7px 0; }
+.toc a { display: flex; gap: 10px; align-items: baseline; }
+.toc a:hover { text-decoration: none; }
+.toc a:hover .toc-t2 { text-decoration: underline; }
+.toc .tn {
+  flex: none; width: 20px; height: 20px; border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--accent);
+  font-size: 12px; font-weight: 600; line-height: 19px; text-align: center;
+}
+.toc .toc-t2 { font-size: 14.5px; color: var(--fg); }
+.toc .tc { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+/* ---------------- 左侧固定目录（宽屏） ----------------
+   宽屏时把目录从正文顶部挪到左边固定住，读到哪儿都能直接跳到别的章节。
+   窄屏放不下侧栏，退回正文顶部那一份 —— 两份目录在 DOM 里都在，靠媒体查询
+   保证任何宽度下**只有一份可见**。纯 CSS，不依赖 JS。
+
+   侧栏只能放在 `.view-rich` 里：文字版的锚点前缀是 `p-`，侧栏若在视图外面、
+   链接却写 `#sec-N`，切到文字版就成了点了没反应的死链。放在里面则随视图一起
+   显隐 —— 这正是想要的。 */
+.toc-side { display: none; }
+@media (min-width: 1320px) {
+  .toc-side {
+    display: block; position: fixed; z-index: 5;
+    top: 24px; left: max(16px, calc(50% - 636px));
+    width: 216px; max-height: calc(100vh - 48px);
+    overflow-y: auto; margin-bottom: 0;
+  }
+  .toc-inline { display: none; }
+}
+/* 点目录跳过去之后，给落地的那一节一个可见的边 —— 否则读者不知道自己跳到了哪儿。 */
+section.card:target { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+
+/* ---------------- 板块卡片 ---------------- */
+section[id] { scroll-margin-top: 16px; }
+.card {
+  border: 1px solid var(--line); border-radius: 16px;
+  padding: 21px 22px 17px; margin-bottom: 24px;
+  background: color-mix(in srgb, var(--bg) 94%, var(--tint));
+  box-shadow: 0 5px 20px rgba(31,35,40,.035);
+}
+.sec-head { display: flex; align-items: center; gap: 11px; margin: 0 0 17px; padding-bottom: 13px; border-bottom: 1px solid var(--line-2); }
+.sec-num {
+  flex: none; width: 30px; height: 30px; border-radius: 9px;
+  background: var(--accent); color: #fff; font-size: 15px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.sec-title { font-size: 18.5px; font-weight: 600; line-height: 1.4; }
+.sec-count { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+/* ---------------- 条目 ---------------- */
+.entry {
+  padding: 17px 18px 15px; margin: 13px 0 0;
+  border: 1px solid var(--line-2); border-left: 3px solid var(--accent);
+  border-radius: 11px; background: var(--bg);
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.entry:hover { border-color: var(--line); box-shadow: 0 7px 22px rgba(31,35,40,.065); transform: translateY(-1px); }
+.entry-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin: 0 0 11px; font-size: 16.5px; line-height: 1.55; font-weight: 600; }
+.entry-head .idx {
+  display: inline-block; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 5px; background: var(--tint); border: 1px solid var(--line);
+  color: var(--muted); font-size: 11.5px; font-weight: 600;
+  line-height: 17px; text-align: center; vertical-align: 2px; margin-right: 7px;
+}
+.entry-head .vendor { color: var(--accent); display: inline-block; padding: 1px 8px; border-radius: 6px; background: var(--accent-soft); font-size: 13px; letter-spacing: .02em; }
+.entry-head .etitle { font-weight: 600; }
+.entry-head .dash { color: var(--muted); font-weight: 400; }
+.rbadge {
+  display: inline-block; padding: 2px 12px; border-radius: 999px;
+  background: var(--tint); border: 1px solid var(--line);
+  color: var(--accent); font-size: 14px; font-weight: 600;
+}
+.pts { list-style: none; padding: 0; margin: 0 0 4px; }
+.pts li { position: relative; padding-left: 17px; margin: 7px 0; }
+.pts li::before {
+  content: ""; position: absolute; left: 3px; top: .68em;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--muted); opacity: .55;
+}
+.entry .src {
+  margin: 12px 0 0; padding-top: 9px; border-top: 1px dotted var(--line);
+  font-size: 13px; color: var(--muted); line-height: 1.9;
+}
+.entry .src .lbl { font-weight: 600; color: var(--muted); }
+.entry .feat {
+  margin: 11px 0 2px; padding: 10px 14px;
+  border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+  background: var(--accent-soft); font-size: 14.5px;
+}
+.entry .feat .lbl { color: var(--accent); font-weight: 700; margin-right: 6px; }
+.entry .src a { display: inline-block; margin: 1px 3px 1px 0; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--tint); font-size: 12px; }
+.entry .src a:hover { border-color: var(--accent); text-decoration: none; }
+
+/* ---------------- 板块五：建议 ---------------- */
+.advice { list-style: none; padding: 0; margin: 0; counter-reset: adv; }
+.advice li {
+  counter-increment: adv; position: relative;
+  padding: 13px 0 13px 40px; border-top: 1px dashed var(--line);
+}
+.advice li:first-child { border-top: 0; }
+.advice li::before {
+  content: counter(adv); position: absolute; left: 0; top: 13px;
+  width: 25px; height: 25px; border-radius: 8px;
+  background: var(--tint); border: 1px solid var(--line); color: var(--accent);
+  font-size: 13px; font-weight: 700; line-height: 24px; text-align: center;
+}
+.advice .adv-lead { margin: 0 0 6px; font-weight: 600; font-size: 15.5px; }
+.advice p { margin: 0; }
+.signoff {
+  margin: 14px 0 0; padding-top: 10px; border-top: 1px dotted var(--line);
+  color: var(--muted); font-size: 12.5px;
+}
+
+@media (max-width: 520px) {
+  .wrap { padding: 16px 15px 56px; }
+  .archive li { flex-direction: column; gap: 2px; }
+  .card { padding: 15px 13px 12px; }
+  .entry { padding: 14px 13px 12px; }
+  .hero { padding: 19px 16px 16px; }
+  .hero h1 .h1b { font-size: 23px; margin-left: 8px; }
+  .sec-count { display: none; }
+  .toc .tc { display: none; }
+  .entry-head { font-size: 15.5px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap has-toggle">
+<nav class="top"><a href="2026-11-02.html">← 上一期</a><a href="index.html">全部往期</a><span class="disabled">下一期 →</span></nav>
+<input type="radio" name="view" id="v-rich" class="vmode" checked><input type="radio" name="view" id="v-plain" class="vmode"><div class="ctrls"><span class="vswitch"><label for="v-rich">图文版</label><label for="v-plain">文字版</label></span><button type="button" class="themebtn" id="themebtn" hidden>深色</button></div><div class="view view-rich"><main><header class="hero"><div class="kicker">储能结构周报</div><h1>2026-11-09</h1><div class="meta"><span class="chip">本期 6 条</span><span class="chip">覆盖周期：2026-10-26 ~ 2026-11-09</span><span class="chip">面向储能结构工程师</span></div></header><aside class="toc toc-side" aria-label="本期目录"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">2 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">2 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">2 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></aside><div class="toc toc-inline"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">2 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">2 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">2 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></div><section class="card" id="sec-1"><div class="sec-head"><span class="sec-num">一</span><span class="sec-title">便携&amp;阳台储能竞品动态</span><span class="sec-count">2 条</span></div><p><strong>本周期说明</strong>：便携电源（portable power station）子类本周期没有新机型发布。窗口内检索到的三条便携动态——DJI Power Auro 2000 Elite（10-28 发布）、Anker SOLIX S5000（10-27 美国开卖）、BLUETTI Apex 200（11-04 正式上市）——都是台账里已推送机型的后续消息，按跨周去重规则不再重复收录。以下两条为阳台／插电式家储与户外结构形态的新进展。</p><article class="entry">
+<h3 class="entry-head"><span class="idx">1</span><span class="vendor">Conow</span><span class="dash"> —— </span><span class="etitle">6 kWh 插电式 AC 家储，把逆变器热量与电芯做成物理隔离</span></h3>
+<ul class="pts">
+<li><strong>发布</strong>：2026-10-26 在德国上市，面向已有屋顶光伏的加装市场；德国渠道价约 €1,249（折合约 €200/kWh）。</li>
+<li><strong>形态</strong>：6,028 Wh LFP + 3,000 W 双向 AC 逆变器做成一体机；805 × 315 × 256 mm，净重 55.9 kg（毛重 59.2 kg），机身厚度 256 mm 属超薄挂墙/落地形态。</li>
+<li><strong>热管理</strong>：不做风扇，靠大体积散热齿做被动散热；逆变器与电芯之间加内部热隔离（heat isolation），阻断逆变器热量进入电池舱；内置加热膜，工作温度 −20~+55 ℃；IP65。</li>
+<li><strong>并网与安装</strong>：出厂经 Schuko 插座直接接入家网，向电网回馈限制为 799 / 800 / 3,000 W 三档；800 W 档约 3 分钟零改线完成，可在德国市场主数据登记；要跑满 3,000 W 回馈必须由电工硬接线，但 3,000 W 充电不受 800 W 限制。</li>
+<li><strong>安全</strong>：多层 BMS 逐电芯监控；内置气溶胶灭火模块，起火初期自动启动；10,000 次循环（25 ℃、70% EOL）、10 年质保、标称 15 年日循环寿命。</li>
+<li><strong>扩展</strong>：AirMesh 无线并联最多 10 台到 60 kWh；3 台可组成三相 9 kW / 18 kWh，单相峰值 4.5 kW，停电切换 &lt;10 ms。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.conow.com/products/atlas-6000-ac-plugin-home-battery" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-5d7a6bf5eac1" data-goatcounter-title="Conow 官网产品页">Conow 官网产品页</a> ｜ <a href="https://www.globenewswire.com/de/news-release/2026/10/26/3387863/0/en/conow-launches-award-winning-atlas-6000-ac-in-germany-advancing-ai-driven-home-energy-management.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-96e7d626a572" data-goatcounter-title="GlobeNewswire 发布稿">GlobeNewswire 发布稿</a></p>
+<p class="feat"><span class="lbl">特点</span> 把&quot;逆变器发热不进电芯舱&quot;单独做成结构特征，并用被动散热替代风扇——这是插电式家储在静音、IP65 与维护便利三者之间给出的一个可复制解法。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="idx">2</span><span class="vendor">Outer Spaces</span><span class="dash"> —— </span><span class="etitle">把 LFP 电池做成户外凉亭的地板</span></h3>
+<ul class="pts">
+<li><strong>发布</strong>：2026-10-29 首次公开 OS1 太阳能凉亭；团队含前 Anker SOLIX 成员；$8M pre-seed（Upfront Ventures 领投），2027 年交付，暂未公布价格，11 月中将现身 RE+ 拉斯维加斯。</li>
+<li><strong>结构</strong>：Horizon BladePack LFP 模块水平嵌入结构的金属平台（deck）内，上方铺木地板，电池在正常视角下不可见；单模块 7.83 kWh，1,470 × 368.6 × 125 mm，约 72 kg；最多 8 模块 / 62.64 kWh。</li>
+<li><strong>热与防护</strong>：被动冷却 + 0 ℃ 以下内置加热；−20~55 ℃，&gt;40 ℃ 降额；IP67；10 年有限质保。</li>
+<li><strong>电气</strong>：配 Fox ESS H1-11.4-US 混合逆变器 + 12 kW DC hub；单模块 7.83 kVA、多模块 11.4 kVA；电机启动能力 80 A / 160 A。</li>
+<li><strong>场景</strong>：12 × 12 ft 与 12 × 24 ft 两种规格，对应 6 / 12 块组件、约 2.5 / 5 kW；支持 AC 耦合、VPP-ready、光伏黑启动（要接发电机需另加 Fox ESS Hub G2）。</li>
+<li><strong>数据待确认</strong>：ESS News 收到两种说法，储能是否从 2 个模块（15 kWh）起配还是单模块 7.83 kWh 起配，官方尚未统一口径。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.ess-news.com/2026/10/29/outer-space-debuts-solar-pavilion-with-hidden-battery-storage-decking/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-2c182fe1ba90" data-goatcounter-title="ESS News">ESS News</a> ｜ <a href="https://www.pv-magazine.it/2026/11/03/outer-space-debuts-solar-pavilion-with-hidden-battery-storage-decking/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-8d50e24b79ad" data-goatcounter-title="pv magazine Italia">pv magazine Italia</a></p>
+<p class="feat"><span class="lbl">特点</span> 电池从&quot;柜体&quot;变成&quot;承载结构的一部分&quot;，125 mm 扁平化 + 被动散热换来的是完全隐藏的人机界面；代价是承重、检修口、排水与热耦合必须由结构自己解决，只能靠木地板覆盖层做视觉消化。</p>
+</article></section><section class="card" id="sec-2"><div class="sec-head"><span class="sec-num">二</span><span class="sec-title">户用&amp;工商业储能与大机动态</span><span class="sec-count">2 条</span></div><article class="entry">
+<h3 class="entry-head"><span class="idx">1</span><span class="vendor">EDENenergy（Fraunhofer ISE 分拆）</span><span class="dash"> —— </span><span class="etitle">112 块退役滑板车电池拼出 70 kWh 工商业储能</span></h3>
+<ul class="pts">
+<li><strong>发布</strong>：2026-11-02 Fraunhofer ISE 新闻稿；10 月中旬已向首位客户交付首套 70 kWh 系统。</li>
+<li><strong>构成</strong>：112 块退役 e-scooter 电池，经入口筛选测试后互联；电池包不拆解，靠自研电力电子完成异构电池接入与通信，避开了&quot;不同电芯、不同 BMS 无法标准化复用&quot;这个死结。</li>
+<li><strong>寿命策略</strong>：模块可单独更换，且支持在系统运行中带电更换；相比常规厂商&quot;10 年后只保证 80% 容量&quot;，它可以把 10 年后的容量维持在 70 kWh 原值。</li>
+<li><strong>实测结果</strong>：首批测试的 350 块电池平均剩余容量部分远超预期，原先按 80% SoH 做测算，实测&quot;部分远超 90%&quot;；静止储能没有行驶振动与温变，衰减比一次寿命更慢。</li>
+<li><strong>下一步</strong>：容量扩到 300 kWh；正在招募区域中型企业试点，可通过州级 &quot;Mittelstand trifft Start-ups&quot; 拿到 50% 补贴；长期需要统一的通信协议与&quot;移动电池转固定储能&quot;的二次寿命立法。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.ise.fraunhofer.de/en/press-media/press-releases/2026/startup-edenenergy-used-escooter-batteries-become-industrial-storage-system.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-42db81450dc3" data-goatcounter-title="Fraunhofer ISE 新闻稿">Fraunhofer ISE 新闻稿</a></p>
+<p class="feat"><span class="lbl">特点</span> 把&quot;模块可换&quot;当作容量保持手段而不是售后手段，结构上等价于把储能柜做成可插拔模块阵列；但代价是每个新电池型号都要适配接插件、BMS 与通信协议，目前仍按批次定制。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="idx">2</span><span class="vendor">Solis（锦浪）</span><span class="dash"> —— </span><span class="etitle">FlexAIO 堆叠式户用一体机，2027 Q1 首批交付</span></h3>
+<ul class="pts">
+<li><strong>发布</strong>：2026-11-09 公开；把逆变器与电池合并在同一台紧凑、可堆叠的机身内。</li>
+<li><strong>规格</strong>：单相高压 3–10 kW 与三相高压 5–20 kW 两个系列；模块化堆叠，安装商可按用户用电曲线配容量、后期再扩容。</li>
+<li><strong>调度</strong>：Solis AI 挂在 SolisCloud 平台，综合光伏发电、用电负荷、天气预报、电池 SOC 与实时电价，自动决定存、用、回馈；动态电价合同下可做充放套利，配置完成后无需人工干预。</li>
+<li><strong>待观察</strong>：单机容量档位、整机重量与堆叠层数上限均未公布，结构参数暂时无法横向对比。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://solarmagazine.nl/nieuws-zonne-energie/i45292/nieuwe-all-in-one-thuisbatterij-flexaio-van-solis-stuurt-met-ai-automatisch-op-stroomkosten-en-productie-zonnepanelen" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-42c893bb98df" data-goatcounter-title="Solar &amp; Storage Magazine">Solar &amp; Storage Magazine</a></p>
+<p class="feat"><span class="lbl">特点</span> 一体机 + 堆叠已是户储主流解，Solis 的差异点不在结构而在&quot;AI 把动态电价吃满&quot;；首批交付要等到 2027 Q1，本周期只是产品定义曝光，不是量产信息。</p>
+</article></section><section class="card" id="sec-3"><div class="sec-head"><span class="sec-num">三</span><span class="sec-title">电池与材料技术突破</span><span class="sec-count">2 条</span></div><article class="entry">
+<h3 class="entry-head"><span class="idx">1</span><span class="vendor">Revolta</span><span class="dash"> —— </span><span class="etitle">德国首套 10 kWh 钠离子户用电池投运</span></h3>
+<ul class="pts">
+<li><strong>投运</strong>：2026-11-05 报道，在阿沙芬堡附近一户住宅完成安装调试；该住宅已有约 20 kW 光伏和一座由旧磨坊改造的小水电（2017 年起供电）。</li>
+<li><strong>系统</strong>：标称 450 V 高压，5 个 2 kWh 模块组成 10 kWh；配 SMA 逆变器；该公司明确这是试点阶段的商业启动，未来数周在德国多个客户场址继续安装并免费加装测量装置采集运行数据。</li>
+<li><strong>模块参数</strong>：单模块 18.7 kg、IP64、<strong>仅 3 个电芯</strong>；0.4 C 充放（对应约 2.5 小时时长）；10 kWh 配置最大输出约 4 kW；能量密度 141 Wh/l、107 Wh/kg。</li>
+<li><strong>商业</strong>：单模块标价 €599，5 模块 10 kWh 套装 €2,995（不含系统其余设备）；2026 年份额已售罄，2027 年开放预订且需付定金。公告未披露额定功率、循环寿命与效率。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.ess-news.com/2026/11/05/revolta-installs-first-10-kwh-sodium-ion-home-battery-in-germany/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-ca384e59070b" data-goatcounter-title="ESS News">ESS News</a> ｜ <a href="https://www.pv-magazine.fr/2026/11/06/revolta-installe-sa-premiere-batterie-residentielle-sodium-ion-de-10-kwh-en-allemagne/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-14eabfd0e37a" data-goatcounter-title="pv magazine France">pv magazine France</a></p>
+<p class="feat"><span class="lbl">特点</span> 107 Wh/kg 意味着同样 10 kWh，柜体体积与重量都比 LFP 方案更吃亏；而 18.7 kg 只装 3 个电芯，说明单体大容量化是它压住结构件数量与装配成本的唯一路径，真实低温表现要等这批试点回传。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="idx">2</span><span class="vendor">Fraunhofer ISE</span><span class="dash"> —— </span><span class="etitle">钠离子电极干法涂布，去溶剂、去 PFAS</span></h3>
+<ul class="pts">
+<li><strong>发布</strong>：2026-11-03 News #28，属 &quot;LAENDLE&quot; 项目，与一家工业伙伴合作完成。</li>
+<li><strong>内容</strong>：为钠离子电池电极开发干法涂布工艺，不使用溶剂，也不含 PFAS 类物质（所谓&quot;永久化学品&quot;）。</li>
+<li><strong>意义</strong>：同时降低生产成本与资源消耗；对德国本土企业而言是进入钠电这条新赛道的切口。</li>
+</ul>
+<p><strong>结构件材料侧</strong>：本周期（2026-10-26 ~ 2026-11-09）未检索到可核实的新增结构件材料进展——钣金冲压/折弯/激光焊、压铸铝、阻燃 PC/ABS 与玻纤增强尼龙都没有新牌号或新工艺窗口发布。材料商侧有 PFAS-free 阻燃 PC 的推广页（UL94 V-0 @1.5 mm、85/85 × 1,500 h），但未附测试报告编号，属产品宣传而非技术进展，故不作为条目收录。</p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.ise.fraunhofer.de/en/press-media.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-ad8384de8c82" data-goatcounter-title="Fraunhofer ISE 新闻列表（News #28）">Fraunhofer ISE 新闻列表（News #28）</a></p>
+<p class="feat"><span class="lbl">特点</span> PFAS 限制正在从&quot;阻燃剂&quot;扩散到&quot;电极助剂&quot;，这条把钠电的成本优势与合规优势压到同一道工艺上；但公告没有给涂布面密度、剥离强度、极片压实这类可用工艺窗口，暂不能判断对现有产线的改造成本。</p>
+</article></section><section class="card" id="sec-4"><div class="sec-head"><span class="sec-num">四</span><span class="sec-title">安规与政策大事件</span><span class="sec-count">3 个地区</span></div><article class="entry">
+<h3 class="entry-head"><span class="rbadge">北美</span></h3>
+<ul class="pts">
+<li><strong>认证更新</strong>：UL Solutions 2026-10-29 发布解读，确认 NFPA 855 2026 版新增 Annex G.11，要求开展&quot;一台 BESS 起火蔓延到相邻 BESS&quot;场景的大规模火灾试验（LSFT），并对如何建立&quot;已发展火灾&quot;初始条件、如何评估间距与主动消防作用给出指引。</li>
+<li><strong>测试方法</strong>：UL 9540A 第 6 版于 2026-03-13 发布、2027-01-01 生效，第 10 节改写为与 Annex G.11 对齐的安装级大规模火灾试验——不再&quot;过了 unit-level 就停&quot;，而是一路做到 installation-level 并带 pass/fail 判据；unit-level 只保留给住宅 BESS，以及带主动 TRPPS（热失控蔓延防护系统）的非住宅 BESS。</li>
+<li><strong>泄放气体</strong>：电芯级测试若出现可燃泄放气，须补做&quot;故意点燃泄放气体&quot;的附加单元级试验，用来证明一台起火不会蔓延到相邻单元——爆燃不再是理论特例，而是标准举证的一部分。</li>
+<li><strong>爆燃防护</strong>：BESS 须按 NFPA 68 与 NFPA 69 做分析，这两项是 2026 版新增的显式要求；前者管泄压口的尺寸、位置与性能，证明爆燃超压可安全泄放且不导致结构失效，后者管可燃浓度控制（CCRS）等预防策略。</li>
+<li><strong>结构影响</strong>：安装级试验需先假定&quot;爆燃后状态&quot;（用 NFPA 68 泄压面积设计或整机爆炸试验确定），意味着箱体门、盖、泄压板在爆燃后仍须保持开启状态并继续参与后续火灾场景；隔板、衬里与固定件要同时承受温度和短时机械载荷，接头与固定方式与材料同等重要。</li>
+<li><strong>数据缺口</strong>：室内系统的喷淋密度与吊顶高度此前一直缺实证数据，新版测试开始补齐，用于判断 NFPA 13 Extra Hazard Group 1 的标准判据是否仍然够用。</li>
+<li><strong>可比性</strong>：第 5 版与第 6 版报告不可直接互比——须先看所用版本、测试构型、试验对象与目标对象间距、目标面温度以及是否发生蔓延；已有提案要求把所用 UL 9540A 版本印在 UL 9540 铭牌与说明书中。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.ul.com/thecodeauthority/knowledge/understanding-UL-9540A-NFPA-855" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-748524f16b95" data-goatcounter-title="UL Solutions：Understanding UL 9540A, NFPA 855 and Large-Scale Fire Testing">UL Solutions：Understanding UL 9540A, NFPA 855 and Large-Scale Fire Testing</a> ｜ <a href="https://www.ul.com/thecodeauthority/knowledge/unlock-compliance-excellence-battery-energy-storage-systems" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-93e8a5ca4812" data-goatcounter-title="UL Solutions：BESS 合规路径解读">UL Solutions：BESS 合规路径解读</a> ｜ <a href="https://www.sbs-rs.de/praxisblaetter/en/batteriespeicher-regulatorik-ausblick-bess.pdf" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-4ecdca621828" data-goatcounter-title="sbs-rs：NFPA 855 / UL 9540A / 欧盟电池法规三套规则的实务解读">sbs-rs：NFPA 855 / UL 9540A / 欧盟电池法规三套规则的实务解读</a></p>
+<p class="feat"><span class="lbl">特点</span> 举证责任从&quot;电芯&quot;整体移到&quot;安装&quot;，结构件从&quot;外壳&quot;升级成最后一段被动屏障；TRPPS 这类主动方案能在测试里加分，但断电即失效，所以被动隔断仍是不可替代项。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="rbadge">欧洲</span></h3>
+<ul class="pts">
+<li><strong>法规进展</strong>：欧盟电池法规 (EU) 2023/1542 的委托法案草案（TBT 通报编号 EU1242）为容量 &gt;2 kWh 的可充电工业电池设定电化学性能与耐久最低值；住宅储能因使用条件相对统一、对消费者影响直接，适用比工商业更严的阈值。</li>
+<li><strong>参数口径</strong>：只取四项与尺寸无关且数据充足的参数——能量往返效率、容量衰减、预期寿命（年）、预期寿命（循环）；并区分&quot;频繁充放&quot;与&quot;按需/备电&quot;两类电池，往返效率与循环寿命只对前者设限。铅酸单列一类。</li>
+<li><strong>安全参数调整</strong>：内部短路被认定为失效模式而非测试项，改由热蔓延防护覆盖；SoH 中的自放电率因 BMS 在真实工况下无可行测量方法，相应调整。</li>
+<li><strong>标识</strong>：QR 码须符合 EN 18220:2026、唯一标识符须符合 EN 18219:2026；容量 &gt;2 kWh 的工业电池数字电池护照自 2027-02-18 强制，DPP 注册系统已于 2026-07-20 开放登记。</li>
+<li><strong>结构影响</strong>：住宅储能一旦要申报往返效率与容量衰减，柜体热设计（风道走向、隔热层、逆变器与电芯隔离）就不再只是可靠性问题，而是合规证据链的一环；同一台机器销往欧洲民用与工商业两个渠道，可能要按两套证据准备。</li>
+<li><strong>状态</strong>：该文本仍是草案，文件自身声明&quot;未经欧委会通过、不代表官方立场&quot;，最终数值与生效日以官方公报为准。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://technical-barriers-trade.ec.europa.eu/en/notification/text/EU1242_EN_DRAFTTEXT1_b01db8cdd460a09ddcb2f2418465fa96.pdf" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-33eb53c5c8ab" data-goatcounter-title="欧盟 TBT 通报草案全文（EU1242）">欧盟 TBT 通报草案全文（EU1242）</a> ｜ <a href="https://www.sbs-rs.de/praxisblaetter/en/batteriespeicher-regulatorik-ausblick-bess.pdf" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-4ecdca621828" data-goatcounter-title="sbs-rs：三套规则实务解读">sbs-rs：三套规则实务解读</a></p>
+<p class="feat"><span class="lbl">特点</span> 这一版真正的新意不是阈值数字，而是&quot;住宅储能单独一档&quot;——它把户用产品从工业电池的大类里切出来，等于承认家用场景对效率与衰减的解释力更强。</p>
+</article><article class="entry">
+<h3 class="entry-head"><span class="rbadge">日本</span></h3>
+<ul class="pts">
+<li><strong>事故报告</strong>：电气关系报告规则修订自 2025-11-20 施行，容量 &gt;20 kWh 的电力储藏装置纳入事故报告对象（专供备用的除外）；METI 手册页在本周期内更新了这条口径。</li>
+<li><strong>系统认定</strong>：专以储电为目的、单独接入系统的&quot;蓄电所&quot;，出力 1 万 kW 以上或容量 8 万 kWh 以上须做工事计划申报与使用前安全管理检查；低于该门槛仍需维持技术基准符合、选任电气主任技术者、报送保安规程。</li>
+<li><strong>低压≠家用</strong>：与系统单独连接、出力 &lt;50 kW 的低压蓄电池，在电气事业法上不按家用蓄电池处理，仍需保安业务——这条对出口日本的工商储产品边界定义影响直接。</li>
+<li><strong>消防口径</strong>：消防予第 558 号（2025-12-23）把 UL 1973 / UL 9540 的符合，作为蓄电设备&quot;出火防止·延烧防止措施&quot;（消防厅告示第 7 号）&quot;同等以上&quot;的示例，为境外认证直接对接日本消防审查开了口子。</li>
+</ul>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.meti.go.jp/policy/safety_security/industrial_safety/sangyo/electric/detail/denryokucyozousouchi.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-2c0aeaf417f6" data-goatcounter-title="METI：电力储藏装置（蓄电池）·蓄电所设置手册">METI：电力储藏装置（蓄电池）·蓄电所设置手册</a> ｜ <a href="https://www.fdma.go.jp/laws/tutatsu/items/241211kiho_351.pdf" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-2e17c096633b" data-goatcounter-title="消防厅：蓄電池を取扱う工場等に係る特例（PDF）">消防厅：蓄電池を取扱う工場等に係る特例（PDF）</a></p>
+<p class="feat"><span class="lbl">特点</span> 日本这一轮用&quot;20 kWh&quot;这条容量线来切事故报告义务，对出口产品来说，铭牌容量怎么写、系统边界怎么划，会直接决定是否进入申报范围。</p>
+</article></section><section class="card" id="sec-5"><div class="sec-head"><span class="sec-num">五</span><span class="sec-title">对华宝新能（Jackery）结构与产品定义的启发</span><span class="sec-count">3 点建议</span></div>
+<ol class="advice">
+<li><p class="adv-lead">把&quot;逆变器热隔离 + 无风扇被动散热&quot;提成 SolarVault / HomePower 的独立结构规格项。</p>
+<p>Conow 用大体积散热齿加逆变器—电芯物理隔离，在 IP65、无风扇的前提下做到 3,000 W 双向。建议把逆变器舱与电池舱的隔热层、风道走向单列为设计项，并在规格书里直接给&quot;电芯舱温升&quot;这个指标，而不是只给整机效率——欧洲一旦把往返效率写进申报，这项数据就是现成的证据。</p>
+</li>
+<li><p class="adv-lead">给 Explorer 系列做一版&quot;地板/嵌入&quot;式结构预研，目标不是量产而是形态与专利储备。</p>
+<p>Outer Spaces 把 125 mm 厚的 LFP 模块做成承载地板，单模块 72 kg / 7.83 kWh，靠木地板覆盖层消化视觉。若考虑阳台地板或露台嵌入，关键约束依次是：单位面积承重、模块能否从上方取出（检修口）、IP67 密封与排水路径、以及 &gt;40 ℃ 降额时的散热通道。建议先出 1:5 截面方案，验证&quot;木地板—金属平台—电芯&quot;三层的装配公差与热耦合。</p>
+</li>
+<li><p class="adv-lead">应急备电叙事从&quot;能带多久&quot;补到&quot;带载瞬间&quot;，把 10 ms 切换与单相峰值功率写成硬指标。</p>
+<p>Conow 与 Solis 都把备电切换时间、单相峰值（4.5 kW）、电机启动能力（80 A / 160 A）做成明确数字。建议 FridgeGuard 与 SolarVault 的备电段落补齐切换时间、单相峰值、启动电流三项，并在 SolarSaga 侧同步标注是否支持光伏黑启动——竞品正在把这几项标准化成对照表，缺项就会被当成弱项。</p>
+</li>
+</ol>
+<p class="signoff">—— 本消息由自动化脚本生成并推送，检索与撰稿由 Doubao 完成</p></section></main></div><div class="view view-plain"><main><h1>[行业资讯] 储能结构周报（2026-11-09）</h1>
+<blockquote>覆盖周期：2026-10-26 ~ 2026-11-09 ｜ 面向储能结构工程师</blockquote>
+<h2 id="p-1">一、便携&amp;阳台储能竞品动态</h2>
+<p><strong>本周期说明</strong>：便携电源（portable power station）子类本周期没有新机型发布。窗口内检索到的三条便携动态——DJI Power Auro 2000 Elite（10-28 发布）、Anker SOLIX S5000（10-27 美国开卖）、BLUETTI Apex 200（11-04 正式上市）——都是台账里已推送机型的后续消息，按跨周去重规则不再重复收录。以下两条为阳台／插电式家储与户外结构形态的新进展。</p>
+<h3>1. <strong>Conow</strong> —— 6 kWh 插电式 AC 家储，把逆变器热量与电芯做成物理隔离</h3>
+<ul><li><strong>发布</strong>：2026-10-26 在德国上市，面向已有屋顶光伏的加装市场；德国渠道价约 €1,249（折合约 €200/kWh）。</li><li><strong>形态</strong>：6,028 Wh LFP + 3,000 W 双向 AC 逆变器做成一体机；805 × 315 × 256 mm，净重 55.9 kg（毛重 59.2 kg），机身厚度 256 mm 属超薄挂墙/落地形态。</li><li><strong>热管理</strong>：不做风扇，靠大体积散热齿做被动散热；逆变器与电芯之间加内部热隔离（heat isolation），阻断逆变器热量进入电池舱；内置加热膜，工作温度 −20~+55 ℃；IP65。</li><li><strong>并网与安装</strong>：出厂经 Schuko 插座直接接入家网，向电网回馈限制为 799 / 800 / 3,000 W 三档；800 W 档约 3 分钟零改线完成，可在德国市场主数据登记；要跑满 3,000 W 回馈必须由电工硬接线，但 3,000 W 充电不受 800 W 限制。</li><li><strong>安全</strong>：多层 BMS 逐电芯监控；内置气溶胶灭火模块，起火初期自动启动；10,000 次循环（25 ℃、70% EOL）、10 年质保、标称 15 年日循环寿命。</li><li><strong>扩展</strong>：AirMesh 无线并联最多 10 台到 60 kWh；3 台可组成三相 9 kW / 18 kWh，单相峰值 4.5 kW，停电切换 &lt;10 ms。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.conow.com/products/atlas-6000-ac-plugin-home-battery" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-5d7a6bf5eac1" data-goatcounter-title="Conow 官网产品页">Conow 官网产品页</a> ｜ <a href="https://www.globenewswire.com/de/news-release/2026/10/26/3387863/0/en/conow-launches-award-winning-atlas-6000-ac-in-germany-advancing-ai-driven-home-energy-management.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-96e7d626a572" data-goatcounter-title="GlobeNewswire 发布稿">GlobeNewswire 发布稿</a><br>
+<strong>特点</strong>：把&quot;逆变器发热不进电芯舱&quot;单独做成结构特征，并用被动散热替代风扇——这是插电式家储在静音、IP65 与维护便利三者之间给出的一个可复制解法。</p>
+<h3>2. <strong>Outer Spaces</strong> —— 把 LFP 电池做成户外凉亭的地板</h3>
+<ul><li><strong>发布</strong>：2026-10-29 首次公开 OS1 太阳能凉亭；团队含前 Anker SOLIX 成员；$8M pre-seed（Upfront Ventures 领投），2027 年交付，暂未公布价格，11 月中将现身 RE+ 拉斯维加斯。</li><li><strong>结构</strong>：Horizon BladePack LFP 模块水平嵌入结构的金属平台（deck）内，上方铺木地板，电池在正常视角下不可见；单模块 7.83 kWh，1,470 × 368.6 × 125 mm，约 72 kg；最多 8 模块 / 62.64 kWh。</li><li><strong>热与防护</strong>：被动冷却 + 0 ℃ 以下内置加热；−20~55 ℃，&gt;40 ℃ 降额；IP67；10 年有限质保。</li><li><strong>电气</strong>：配 Fox ESS H1-11.4-US 混合逆变器 + 12 kW DC hub；单模块 7.83 kVA、多模块 11.4 kVA；电机启动能力 80 A / 160 A。</li><li><strong>场景</strong>：12 × 12 ft 与 12 × 24 ft 两种规格，对应 6 / 12 块组件、约 2.5 / 5 kW；支持 AC 耦合、VPP-ready、光伏黑启动（要接发电机需另加 Fox ESS Hub G2）。</li><li><strong>数据待确认</strong>：ESS News 收到两种说法，储能是否从 2 个模块（15 kWh）起配还是单模块 7.83 kWh 起配，官方尚未统一口径。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.ess-news.com/2026/10/29/outer-space-debuts-solar-pavilion-with-hidden-battery-storage-decking/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-2c182fe1ba90" data-goatcounter-title="ESS News">ESS News</a> ｜ <a href="https://www.pv-magazine.it/2026/11/03/outer-space-debuts-solar-pavilion-with-hidden-battery-storage-decking/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-8d50e24b79ad" data-goatcounter-title="pv magazine Italia">pv magazine Italia</a><br>
+<strong>特点</strong>：电池从&quot;柜体&quot;变成&quot;承载结构的一部分&quot;，125 mm 扁平化 + 被动散热换来的是完全隐藏的人机界面；代价是承重、检修口、排水与热耦合必须由结构自己解决，只能靠木地板覆盖层做视觉消化。</p>
+<h2 id="p-2">二、户用&amp;工商业储能与大机动态</h2>
+<h3>1. <strong>EDENenergy（Fraunhofer ISE 分拆）</strong> —— 112 块退役滑板车电池拼出 70 kWh 工商业储能</h3>
+<ul><li><strong>发布</strong>：2026-11-02 Fraunhofer ISE 新闻稿；10 月中旬已向首位客户交付首套 70 kWh 系统。</li><li><strong>构成</strong>：112 块退役 e-scooter 电池，经入口筛选测试后互联；电池包不拆解，靠自研电力电子完成异构电池接入与通信，避开了&quot;不同电芯、不同 BMS 无法标准化复用&quot;这个死结。</li><li><strong>寿命策略</strong>：模块可单独更换，且支持在系统运行中带电更换；相比常规厂商&quot;10 年后只保证 80% 容量&quot;，它可以把 10 年后的容量维持在 70 kWh 原值。</li><li><strong>实测结果</strong>：首批测试的 350 块电池平均剩余容量部分远超预期，原先按 80% SoH 做测算，实测&quot;部分远超 90%&quot;；静止储能没有行驶振动与温变，衰减比一次寿命更慢。</li><li><strong>下一步</strong>：容量扩到 300 kWh；正在招募区域中型企业试点，可通过州级 &quot;Mittelstand trifft Start-ups&quot; 拿到 50% 补贴；长期需要统一的通信协议与&quot;移动电池转固定储能&quot;的二次寿命立法。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.ise.fraunhofer.de/en/press-media/press-releases/2026/startup-edenenergy-used-escooter-batteries-become-industrial-storage-system.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-42db81450dc3" data-goatcounter-title="Fraunhofer ISE 新闻稿">Fraunhofer ISE 新闻稿</a><br>
+<strong>特点</strong>：把&quot;模块可换&quot;当作容量保持手段而不是售后手段，结构上等价于把储能柜做成可插拔模块阵列；但代价是每个新电池型号都要适配接插件、BMS 与通信协议，目前仍按批次定制。</p>
+<h3>2. <strong>Solis（锦浪）</strong> —— FlexAIO 堆叠式户用一体机，2027 Q1 首批交付</h3>
+<ul><li><strong>发布</strong>：2026-11-09 公开；把逆变器与电池合并在同一台紧凑、可堆叠的机身内。</li><li><strong>规格</strong>：单相高压 3–10 kW 与三相高压 5–20 kW 两个系列；模块化堆叠，安装商可按用户用电曲线配容量、后期再扩容。</li><li><strong>调度</strong>：Solis AI 挂在 SolisCloud 平台，综合光伏发电、用电负荷、天气预报、电池 SOC 与实时电价，自动决定存、用、回馈；动态电价合同下可做充放套利，配置完成后无需人工干预。</li><li><strong>待观察</strong>：单机容量档位、整机重量与堆叠层数上限均未公布，结构参数暂时无法横向对比。</li></ul>
+<p><strong>来源</strong>：<a href="https://solarmagazine.nl/nieuws-zonne-energie/i45292/nieuwe-all-in-one-thuisbatterij-flexaio-van-solis-stuurt-met-ai-automatisch-op-stroomkosten-en-productie-zonnepanelen" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-42c893bb98df" data-goatcounter-title="Solar &amp; Storage Magazine">Solar &amp; Storage Magazine</a><br>
+<strong>特点</strong>：一体机 + 堆叠已是户储主流解，Solis 的差异点不在结构而在&quot;AI 把动态电价吃满&quot;；首批交付要等到 2027 Q1，本周期只是产品定义曝光，不是量产信息。</p>
+<h2 id="p-3">三、电池与材料技术突破</h2>
+<h3>1. <strong>Revolta</strong> —— 德国首套 10 kWh 钠离子户用电池投运</h3>
+<ul><li><strong>投运</strong>：2026-11-05 报道，在阿沙芬堡附近一户住宅完成安装调试；该住宅已有约 20 kW 光伏和一座由旧磨坊改造的小水电（2017 年起供电）。</li><li><strong>系统</strong>：标称 450 V 高压，5 个 2 kWh 模块组成 10 kWh；配 SMA 逆变器；该公司明确这是试点阶段的商业启动，未来数周在德国多个客户场址继续安装并免费加装测量装置采集运行数据。</li><li><strong>模块参数</strong>：单模块 18.7 kg、IP64、<strong>仅 3 个电芯</strong>；0.4 C 充放（对应约 2.5 小时时长）；10 kWh 配置最大输出约 4 kW；能量密度 141 Wh/l、107 Wh/kg。</li><li><strong>商业</strong>：单模块标价 €599，5 模块 10 kWh 套装 €2,995（不含系统其余设备）；2026 年份额已售罄，2027 年开放预订且需付定金。公告未披露额定功率、循环寿命与效率。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.ess-news.com/2026/11/05/revolta-installs-first-10-kwh-sodium-ion-home-battery-in-germany/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-ca384e59070b" data-goatcounter-title="ESS News">ESS News</a> ｜ <a href="https://www.pv-magazine.fr/2026/11/06/revolta-installe-sa-premiere-batterie-residentielle-sodium-ion-de-10-kwh-en-allemagne/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-14eabfd0e37a" data-goatcounter-title="pv magazine France">pv magazine France</a><br>
+<strong>特点</strong>：107 Wh/kg 意味着同样 10 kWh，柜体体积与重量都比 LFP 方案更吃亏；而 18.7 kg 只装 3 个电芯，说明单体大容量化是它压住结构件数量与装配成本的唯一路径，真实低温表现要等这批试点回传。</p>
+<h3>2. <strong>Fraunhofer ISE</strong> —— 钠离子电极干法涂布，去溶剂、去 PFAS</h3>
+<ul><li><strong>发布</strong>：2026-11-03 News #28，属 &quot;LAENDLE&quot; 项目，与一家工业伙伴合作完成。</li><li><strong>内容</strong>：为钠离子电池电极开发干法涂布工艺，不使用溶剂，也不含 PFAS 类物质（所谓&quot;永久化学品&quot;）。</li><li><strong>意义</strong>：同时降低生产成本与资源消耗；对德国本土企业而言是进入钠电这条新赛道的切口。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.ise.fraunhofer.de/en/press-media.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-ad8384de8c82" data-goatcounter-title="Fraunhofer ISE 新闻列表（News #28）">Fraunhofer ISE 新闻列表（News #28）</a><br>
+<strong>特点</strong>：PFAS 限制正在从&quot;阻燃剂&quot;扩散到&quot;电极助剂&quot;，这条把钠电的成本优势与合规优势压到同一道工艺上；但公告没有给涂布面密度、剥离强度、极片压实这类可用工艺窗口，暂不能判断对现有产线的改造成本。</p>
+<p><strong>结构件材料侧</strong>：本周期（2026-10-26 ~ 2026-11-09）未检索到可核实的新增结构件材料进展——钣金冲压/折弯/激光焊、压铸铝、阻燃 PC/ABS 与玻纤增强尼龙都没有新牌号或新工艺窗口发布。材料商侧有 PFAS-free 阻燃 PC 的推广页（UL94 V-0 @1.5 mm、85/85 × 1,500 h），但未附测试报告编号，属产品宣传而非技术进展，故不作为条目收录。</p>
+<h2 id="p-4">四、安规与政策大事件</h2>
+<p><strong>北美</strong></p>
+<ul><li><strong>认证更新</strong>：UL Solutions 2026-10-29 发布解读，确认 NFPA 855 2026 版新增 Annex G.11，要求开展&quot;一台 BESS 起火蔓延到相邻 BESS&quot;场景的大规模火灾试验（LSFT），并对如何建立&quot;已发展火灾&quot;初始条件、如何评估间距与主动消防作用给出指引。</li><li><strong>测试方法</strong>：UL 9540A 第 6 版于 2026-03-13 发布、2027-01-01 生效，第 10 节改写为与 Annex G.11 对齐的安装级大规模火灾试验——不再&quot;过了 unit-level 就停&quot;，而是一路做到 installation-level 并带 pass/fail 判据；unit-level 只保留给住宅 BESS，以及带主动 TRPPS（热失控蔓延防护系统）的非住宅 BESS。</li><li><strong>泄放气体</strong>：电芯级测试若出现可燃泄放气，须补做&quot;故意点燃泄放气体&quot;的附加单元级试验，用来证明一台起火不会蔓延到相邻单元——爆燃不再是理论特例，而是标准举证的一部分。</li><li><strong>爆燃防护</strong>：BESS 须按 NFPA 68 与 NFPA 69 做分析，这两项是 2026 版新增的显式要求；前者管泄压口的尺寸、位置与性能，证明爆燃超压可安全泄放且不导致结构失效，后者管可燃浓度控制（CCRS）等预防策略。</li><li><strong>结构影响</strong>：安装级试验需先假定&quot;爆燃后状态&quot;（用 NFPA 68 泄压面积设计或整机爆炸试验确定），意味着箱体门、盖、泄压板在爆燃后仍须保持开启状态并继续参与后续火灾场景；隔板、衬里与固定件要同时承受温度和短时机械载荷，接头与固定方式与材料同等重要。</li><li><strong>数据缺口</strong>：室内系统的喷淋密度与吊顶高度此前一直缺实证数据，新版测试开始补齐，用于判断 NFPA 13 Extra Hazard Group 1 的标准判据是否仍然够用。</li><li><strong>可比性</strong>：第 5 版与第 6 版报告不可直接互比——须先看所用版本、测试构型、试验对象与目标对象间距、目标面温度以及是否发生蔓延；已有提案要求把所用 UL 9540A 版本印在 UL 9540 铭牌与说明书中。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.ul.com/thecodeauthority/knowledge/understanding-UL-9540A-NFPA-855" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-748524f16b95" data-goatcounter-title="UL Solutions：Understanding UL 9540A, NFPA 855 and Large-Scale Fire Testing">UL Solutions：Understanding UL 9540A, NFPA 855 and Large-Scale Fire Testing</a> ｜ <a href="https://www.ul.com/thecodeauthority/knowledge/unlock-compliance-excellence-battery-energy-storage-systems" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-93e8a5ca4812" data-goatcounter-title="UL Solutions：BESS 合规路径解读">UL Solutions：BESS 合规路径解读</a> ｜ <a href="https://www.sbs-rs.de/praxisblaetter/en/batteriespeicher-regulatorik-ausblick-bess.pdf" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-4ecdca621828" data-goatcounter-title="sbs-rs：NFPA 855 / UL 9540A / 欧盟电池法规三套规则的实务解读">sbs-rs：NFPA 855 / UL 9540A / 欧盟电池法规三套规则的实务解读</a><br>
+<strong>特点</strong>：举证责任从&quot;电芯&quot;整体移到&quot;安装&quot;，结构件从&quot;外壳&quot;升级成最后一段被动屏障；TRPPS 这类主动方案能在测试里加分，但断电即失效，所以被动隔断仍是不可替代项。</p>
+<p><strong>欧洲</strong></p>
+<ul><li><strong>法规进展</strong>：欧盟电池法规 (EU) 2023/1542 的委托法案草案（TBT 通报编号 EU1242）为容量 &gt;2 kWh 的可充电工业电池设定电化学性能与耐久最低值；住宅储能因使用条件相对统一、对消费者影响直接，适用比工商业更严的阈值。</li><li><strong>参数口径</strong>：只取四项与尺寸无关且数据充足的参数——能量往返效率、容量衰减、预期寿命（年）、预期寿命（循环）；并区分&quot;频繁充放&quot;与&quot;按需/备电&quot;两类电池，往返效率与循环寿命只对前者设限。铅酸单列一类。</li><li><strong>安全参数调整</strong>：内部短路被认定为失效模式而非测试项，改由热蔓延防护覆盖；SoH 中的自放电率因 BMS 在真实工况下无可行测量方法，相应调整。</li><li><strong>标识</strong>：QR 码须符合 EN 18220:2026、唯一标识符须符合 EN 18219:2026；容量 &gt;2 kWh 的工业电池数字电池护照自 2027-02-18 强制，DPP 注册系统已于 2026-07-20 开放登记。</li><li><strong>结构影响</strong>：住宅储能一旦要申报往返效率与容量衰减，柜体热设计（风道走向、隔热层、逆变器与电芯隔离）就不再只是可靠性问题，而是合规证据链的一环；同一台机器销往欧洲民用与工商业两个渠道，可能要按两套证据准备。</li><li><strong>状态</strong>：该文本仍是草案，文件自身声明&quot;未经欧委会通过、不代表官方立场&quot;，最终数值与生效日以官方公报为准。</li></ul>
+<p><strong>来源</strong>：<a href="https://technical-barriers-trade.ec.europa.eu/en/notification/text/EU1242_EN_DRAFTTEXT1_b01db8cdd460a09ddcb2f2418465fa96.pdf" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-33eb53c5c8ab" data-goatcounter-title="欧盟 TBT 通报草案全文（EU1242）">欧盟 TBT 通报草案全文（EU1242）</a> ｜ <a href="https://www.sbs-rs.de/praxisblaetter/en/batteriespeicher-regulatorik-ausblick-bess.pdf" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-4ecdca621828" data-goatcounter-title="sbs-rs：三套规则实务解读">sbs-rs：三套规则实务解读</a><br>
+<strong>特点</strong>：这一版真正的新意不是阈值数字，而是&quot;住宅储能单独一档&quot;——它把户用产品从工业电池的大类里切出来，等于承认家用场景对效率与衰减的解释力更强。</p>
+<p><strong>日本</strong></p>
+<ul><li><strong>事故报告</strong>：电气关系报告规则修订自 2025-11-20 施行，容量 &gt;20 kWh 的电力储藏装置纳入事故报告对象（专供备用的除外）；METI 手册页在本周期内更新了这条口径。</li><li><strong>系统认定</strong>：专以储电为目的、单独接入系统的&quot;蓄电所&quot;，出力 1 万 kW 以上或容量 8 万 kWh 以上须做工事计划申报与使用前安全管理检查；低于该门槛仍需维持技术基准符合、选任电气主任技术者、报送保安规程。</li><li><strong>低压≠家用</strong>：与系统单独连接、出力 &lt;50 kW 的低压蓄电池，在电气事业法上不按家用蓄电池处理，仍需保安业务——这条对出口日本的工商储产品边界定义影响直接。</li><li><strong>消防口径</strong>：消防予第 558 号（2025-12-23）把 UL 1973 / UL 9540 的符合，作为蓄电设备&quot;出火防止·延烧防止措施&quot;（消防厅告示第 7 号）&quot;同等以上&quot;的示例，为境外认证直接对接日本消防审查开了口子。</li></ul>
+<p><strong>来源</strong>：<a href="https://www.meti.go.jp/policy/safety_security/industrial_safety/sangyo/electric/detail/denryokucyozousouchi.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-2c0aeaf417f6" data-goatcounter-title="METI：电力储藏装置（蓄电池）·蓄电所设置手册">METI：电力储藏装置（蓄电池）·蓄电所设置手册</a> ｜ <a href="https://www.fdma.go.jp/laws/tutatsu/items/241211kiho_351.pdf" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-2e17c096633b" data-goatcounter-title="消防厅：蓄電池を取扱う工場等に係る特例（PDF）">消防厅：蓄電池を取扱う工場等に係る特例（PDF）</a><br>
+<strong>特点</strong>：日本这一轮用&quot;20 kWh&quot;这条容量线来切事故报告义务，对出口产品来说，铭牌容量怎么写、系统边界怎么划，会直接决定是否进入申报范围。</p>
+<h2 id="p-5">五、对华宝新能（Jackery）结构与产品定义的启发</h2>
+<ol><li><strong>把&quot;逆变器热隔离 + 无风扇被动散热&quot;提成 SolarVault / HomePower 的独立结构规格项。</strong> Conow 用大体积散热齿加逆变器—电芯物理隔离，在 IP65、无风扇的前提下做到 3,000 W 双向。建议把逆变器舱与电池舱的隔热层、风道走向单列为设计项，并在规格书里直接给&quot;电芯舱温升&quot;这个指标，而不是只给整机效率——欧洲一旦把往返效率写进申报，这项数据就是现成的证据。</li></ol>
+<ol><li><strong>给 Explorer 系列做一版&quot;地板/嵌入&quot;式结构预研，目标不是量产而是形态与专利储备。</strong> Outer Spaces 把 125 mm 厚的 LFP 模块做成承载地板，单模块 72 kg / 7.83 kWh，靠木地板覆盖层消化视觉。若考虑阳台地板或露台嵌入，关键约束依次是：单位面积承重、模块能否从上方取出（检修口）、IP67 密封与排水路径、以及 &gt;40 ℃ 降额时的散热通道。建议先出 1:5 截面方案，验证&quot;木地板—金属平台—电芯&quot;三层的装配公差与热耦合。</li></ol>
+<ol><li><strong>应急备电叙事从&quot;能带多久&quot;补到&quot;带载瞬间&quot;，把 10 ms 切换与单相峰值功率写成硬指标。</strong> Conow 与 Solis 都把备电切换时间、单相峰值（4.5 kW）、电机启动能力（80 A / 160 A）做成明确数字。建议 FridgeGuard 与 SolarVault 的备电段落补齐切换时间、单相峰值、启动电流三项，并在 SolarSaga 侧同步标注是否支持光伏黑启动——竞品正在把这几项标准化成对照表，缺项就会被当成弱项。</li></ol>
+<p>—— 本消息由自动化脚本生成并推送，检索与撰稿由 Doubao 完成</p></main></div>
+<footer>本页由脚本自动生成 ｜ 检索源：Perplexity sonar-pro-search</footer>
+</div>
+</body>
+</html>

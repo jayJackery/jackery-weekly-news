@@ -36,6 +36,7 @@
   }
 })();
 </script>
+
 <style>
 :root {
   --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
@@ -150,14 +151,23 @@ footer {
 
 /* ---------------- 报告头 ---------------- */
 .hero {
-  background: var(--tint); border: 1px solid var(--line); border-radius: 14px;
-  padding: 22px 22px 18px; margin-bottom: 20px;
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, var(--tint), var(--bg) 72%);
+  border: 1px solid var(--line); border-radius: 18px;
+  padding: 28px 26px 22px; margin-bottom: 24px;
+  box-shadow: 0 8px 28px rgba(31,35,40,.045);
+}
+.hero::after {
+  content: ""; position: absolute; width: 180px; height: 180px; right: -55px; top: -75px;
+  border: 1px solid var(--line); border-radius: 50%; opacity: .55;
+  box-shadow: 0 0 0 22px var(--bg), 0 0 0 23px var(--line), 0 0 0 48px var(--bg), 0 0 0 49px var(--line);
+  pointer-events: none;
 }
 .hero .kicker {
   font-size: 12.5px; font-weight: 600; letter-spacing: .1em;
   color: var(--accent); margin-bottom: 6px;
 }
-.hero h1 { margin: 0 0 14px; line-height: 1.3; }
+.hero h1 { position: relative; z-index: 1; margin: 0 0 14px; line-height: 1.3; }
 .hero h1 .h1a { font-size: 19px; font-weight: 500; }
 .hero h1 .h1b {
   font-size: 27px; font-weight: 700; margin-left: 10px;
@@ -218,10 +228,12 @@ section.card:target { border-color: var(--accent); box-shadow: 0 0 0 3px var(--a
 /* ---------------- 板块卡片 ---------------- */
 section[id] { scroll-margin-top: 16px; }
 .card {
-  border: 1px solid var(--line); border-radius: 12px;
-  padding: 18px 20px 14px; margin-bottom: 22px;
+  border: 1px solid var(--line); border-radius: 16px;
+  padding: 21px 22px 17px; margin-bottom: 24px;
+  background: color-mix(in srgb, var(--bg) 94%, var(--tint));
+  box-shadow: 0 5px 20px rgba(31,35,40,.035);
 }
-.sec-head { display: flex; align-items: center; gap: 11px; margin: 0 0 12px; }
+.sec-head { display: flex; align-items: center; gap: 11px; margin: 0 0 17px; padding-bottom: 13px; border-bottom: 1px solid var(--line-2); }
 .sec-num {
   flex: none; width: 30px; height: 30px; border-radius: 9px;
   background: var(--accent); color: #fff; font-size: 15px; font-weight: 600;
@@ -231,17 +243,22 @@ section[id] { scroll-margin-top: 16px; }
 .sec-count { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 
 /* ---------------- 条目 ---------------- */
-.entry { padding: 15px 0 4px; border-top: 1px dashed var(--line); }
-.entry:first-of-type { border-top: 0; padding-top: 2px; }
-.entry-head { margin: 0 0 9px; font-size: 16.5px; line-height: 1.55; font-weight: 600; }
+.entry {
+  padding: 17px 18px 15px; margin: 13px 0 0;
+  border: 1px solid var(--line-2); border-left: 3px solid var(--accent);
+  border-radius: 11px; background: var(--bg);
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.entry:hover { border-color: var(--line); box-shadow: 0 7px 22px rgba(31,35,40,.065); transform: translateY(-1px); }
+.entry-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin: 0 0 11px; font-size: 16.5px; line-height: 1.55; font-weight: 600; }
 .entry-head .idx {
   display: inline-block; min-width: 18px; height: 18px; padding: 0 5px;
   border-radius: 5px; background: var(--tint); border: 1px solid var(--line);
   color: var(--muted); font-size: 11.5px; font-weight: 600;
   line-height: 17px; text-align: center; vertical-align: 2px; margin-right: 7px;
 }
-.entry-head .vendor { color: var(--accent); }
-.entry-head .etitle { font-weight: 500; }
+.entry-head .vendor { color: var(--accent); display: inline-block; padding: 1px 8px; border-radius: 6px; background: var(--accent-soft); font-size: 13px; letter-spacing: .02em; }
+.entry-head .etitle { font-weight: 600; }
 .entry-head .dash { color: var(--muted); font-weight: 400; }
 .rbadge {
   display: inline-block; padding: 2px 12px; border-radius: 999px;
@@ -265,6 +282,8 @@ section[id] { scroll-margin-top: 16px; }
   background: var(--accent-soft); font-size: 14.5px;
 }
 .entry .feat .lbl { color: var(--accent); font-weight: 700; margin-right: 6px; }
+.entry .src a { display: inline-block; margin: 1px 3px 1px 0; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--tint); font-size: 12px; }
+.entry .src a:hover { border-color: var(--accent); text-decoration: none; }
 
 /* ---------------- 板块五：建议 ---------------- */
 .advice { list-style: none; padding: 0; margin: 0; counter-reset: adv; }
@@ -289,8 +308,9 @@ section[id] { scroll-margin-top: 16px; }
 @media (max-width: 520px) {
   .wrap { padding: 16px 15px 56px; }
   .archive li { flex-direction: column; gap: 2px; }
-  .card { padding: 15px 15px 11px; }
-  .hero { padding: 18px 16px 15px; }
+  .card { padding: 15px 13px 12px; }
+  .entry { padding: 14px 13px 12px; }
+  .hero { padding: 19px 16px 16px; }
   .hero h1 .h1b { font-size: 23px; margin-left: 8px; }
   .sec-count { display: none; }
   .toc .tc { display: none; }
@@ -300,7 +320,7 @@ section[id] { scroll-margin-top: 16px; }
 </head>
 <body>
 <div class="wrap has-toggle">
-<nav class="top"><a href="2026-10-26.html">← 上一期</a><a href="index.html">全部往期</a><span class="disabled">下一期 →</span></nav>
+<nav class="top"><a href="2026-10-26.html">← 上一期</a><a href="index.html">全部往期</a><a href="2026-11-09.html">下一期 →</a></nav>
 <input type="radio" name="view" id="v-rich" class="vmode" checked><input type="radio" name="view" id="v-plain" class="vmode"><div class="ctrls"><span class="vswitch"><label for="v-rich">图文版</label><label for="v-plain">文字版</label></span><button type="button" class="themebtn" id="themebtn" hidden>深色</button></div><div class="view view-rich"><main><header class="hero"><div class="kicker">储能结构周报</div><h1>2026-11-02</h1><div class="meta"><span class="chip">本期 11 条</span><span class="chip">覆盖周期：2026-10-19 ~ 2026-11-02</span><span class="chip">面向储能结构工程师</span></div></header><aside class="toc toc-side" aria-label="本期目录"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">3 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">5 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">3 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></aside><div class="toc toc-inline"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">3 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">5 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">3 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></div><section class="card" id="sec-1"><div class="sec-head"><span class="sec-num">一</span><span class="sec-title">便携&amp;阳台储能竞品动态</span><span class="sec-count">3 条</span></div><article class="entry">
 <h3 class="entry-head"><span class="idx">1</span><span class="vendor">BLUETTI</span><span class="dash"> —— </span><span class="etitle">Apex 200 将 2.56kWh 便携电源压缩至 27kg 级</span></h3>
 <ul class="pts">
@@ -311,7 +331,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>充电</strong>：交流快充可在 46 分钟充至 80%。</li>
 <li><strong>缺口</strong>：截至报道时，未公开正式价格、整机尺寸、IP 防护等级和循环寿命。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://www.ess-news.com/2026/10/23/bluetti-launching-apex-200-with-2-56-kwh-capacity-and-a-huge-drop-in-size-and-weight-from-apex-300/" target="_blank" rel="noopener noreferrer">ESS News</a> ｜ <a href="https://en.best-batteries.com/product-launches/" target="_blank" rel="noopener noreferrer">Best Batteries</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.ess-news.com/2026/10/23/bluetti-launching-apex-200-with-2-56-kwh-capacity-and-a-huge-drop-in-size-and-weight-from-apex-300/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-8563b99817e3" data-goatcounter-title="ESS News">ESS News</a> ｜ <a href="https://en.best-batteries.com/product-launches/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-702571be4d4b" data-goatcounter-title="Best Batteries">Best Batteries</a></p>
 <p class="feat"><span class="lbl">特点</span> Apex 200 的结构路线是以明显减重和缩容换取可搬运性，同时保留高功率输出与大容量扩展能力。</p>
 </article><article class="entry">
 <h3 class="entry-head"><span class="idx">2</span><span class="vendor">DJI Power</span><span class="dash"> —— </span><span class="etitle">Power Auro 2000 Elite 将充电模块内置到约 19kg 的 2kWh 机身</span></h3>
@@ -323,7 +343,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>充电与维护</strong>：交流输入最高 2,000W，0% 至 80% 约需 60 分钟；双 SDC 光伏输入合计最高 1,200W；支持 DJI Home App 监控。</li>
 <li><strong>价格与缺口</strong>：欧洲售价 1,099 欧元，提供五年质保；未披露 IP 防护等级、循环寿命和完整尺寸。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://www.pv-magazine.com/2026/10/29/dji-power-launches-new-auro-2000-elite-as-its-most-compact-2-kwh-power-station/" target="_blank" rel="noopener noreferrer">pv magazine</a> ｜ <a href="https://www.prnewswire.com/news-releases/new-dji-power-auro-2000-elite-packs-car-charging-and-solar-benefits-into-djis-most-compact-2kwh-power-station-302923109.html" target="_blank" rel="noopener noreferrer">PR Newswire</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.pv-magazine.com/2026/10/29/dji-power-launches-new-auro-2000-elite-as-its-most-compact-2-kwh-power-station/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-02b2d68a931e" data-goatcounter-title="pv magazine">pv magazine</a> ｜ <a href="https://www.prnewswire.com/news-releases/new-dji-power-auro-2000-elite-packs-car-charging-and-solar-benefits-into-djis-most-compact-2kwh-power-station-302923109.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-bfb1e340fe3b" data-goatcounter-title="PR Newswire">PR Newswire</a></p>
 <p class="feat"><span class="lbl">特点</span> DJI Power 把车充、MPPT 和线缆收纳从外置附件转为机内集成，结构重点转向前侧接口集中与充电链路的一体化。</p>
 </article><article class="entry">
 <h3 class="entry-head"><span class="idx">3</span><span class="vendor">Hoymiles</span><span class="dash"> —— </span><span class="etitle">HiOne 在澳大利亚展出 8–64kWh 可堆叠家储架构</span></h3>
@@ -334,7 +354,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>并离网切换</strong>：HiSwitch 与 HiBox 配合支持离网切换和全屋备电，系统架构不再局限于单一光伏逆变器配套。</li>
 <li><strong>缺口</strong>：未公开 HiOne 的 IP 防护等级、循环寿命、单模块容量、整机尺寸、重量和价格。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://www.hoymiles.com/product-release.html" target="_blank" rel="noopener noreferrer">Hoymiles</a> ｜ <a href="https://www.aap.com.au/aapreleases/cision20261029ae84505/" target="_blank" rel="noopener noreferrer">AAP / PR Newswire</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.hoymiles.com/product-release.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-945e212ce953" data-goatcounter-title="Hoymiles">Hoymiles</a> ｜ <a href="https://www.aap.com.au/aapreleases/cision20261029ae84505/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-56e38653d55d" data-goatcounter-title="AAP / PR Newswire">AAP / PR Newswire</a></p>
 <p class="feat"><span class="lbl">特点</span> HiOne 的核心不是单机便携化，而是通过堆叠电池、DIN 导轨控制单元和扩展盒拆分安装边界，降低不同家庭容量段的结构复用成本。</p>
 </article></section><section class="card" id="sec-2"><div class="sec-head"><span class="sec-num">二</span><span class="sec-title">户用&amp;工商业储能与大机动态</span><span class="sec-count">5 条</span></div><article class="entry">
 <h3 class="entry-head"><span class="idx">1</span><span class="vendor">Hoymiles</span><span class="dash"> —— </span><span class="etitle">HoyUltra 2,000M 将 2MWh 级工商业储能集成进液冷集装箱</span></h3>
@@ -346,7 +366,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>防护与消防</strong>：机柜防护等级为 IP55，具备 C5 防腐蚀等级；集成烟雾与温度探测、灭火、联锁通风和舱体泄爆装置。</li>
 <li><strong>缺口</strong>：报道未公开单柜电芯规格、液冷回路压力与流量、循环寿命及系统价格。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="http://www.pv-magazine.com/2026/10/21/hoymiles-releases-a-2000-kwh-ci-energy-storage-solution/" target="_blank" rel="noopener noreferrer">pv magazine</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="http://www.pv-magazine.com/2026/10/21/hoymiles-releases-a-2000-kwh-ci-energy-storage-solution/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-51cc661ed2ab" data-goatcounter-title="pv magazine">pv magazine</a></p>
 <p class="feat"><span class="lbl">特点</span> 该方案把电池、PCS、液冷、STS 和消防边界收进同一集装箱，结构设计重点从单一电池柜转向高压交流接口、舱内分区和泄爆路径协同。</p>
 </article><article class="entry">
 <h3 class="entry-head"><span class="idx">2</span><span class="vendor">CATL</span><span class="dash"> —— </span><span class="etitle">TENER+ 以 9MWh 单系统容量压缩集装箱数量和场站占地</span></h3>
@@ -358,7 +378,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>系统边界</strong>：本次披露重点在电池侧系统和 PCS 适配，未公开完整集装箱尺寸、整机重量、IP 等级和液冷参数。</li>
 <li><strong>缺口</strong>：未公开 TENER+ 的具体电芯容量、Pack 排布、消防系统细节、循环寿命及价格。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://www.energy-storage.news/catl-holds-global-launch-for-9mwh-tener-bess-at-all-energy-australia-signs-pcs-agreement-with-hitachi-energy/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.energy-storage.news/catl-holds-global-launch-for-9mwh-tener-bess-at-all-energy-australia-signs-pcs-agreement-with-hitachi-energy/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-515d1bc830d1" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a></p>
 <p class="feat"><span class="lbl">特点</span> TENER+ 的结构路线是通过提高单箱容量减少基础、吊装和直流连接数量，但其对箱内热失控分区及维护通道的具体影响仍缺少公开数据。</p>
 </article><article class="entry">
 <h3 class="entry-head"><span class="idx">3</span><span class="vendor">Sineng Electric</span><span class="dash"> —— </span><span class="etitle">液冷组串 PCS 将构网型控制与热管理集成</span></h3>
@@ -370,7 +390,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>效率影响</strong>：厂商宣称液冷设计可使辅助功耗降低 30%，满载 IGBT 温升降低 5K。</li>
 <li><strong>缺口</strong>：未公开 PCS 外形尺寸、重量、IP 等级、液冷介质、流量和维护周期。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://www.energy-storage.news/industry-updates/sineng-electric-showcases-grid-forming-technology-and-solar-storage-hydrogen-solutions-at-rei/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.energy-storage.news/industry-updates/sineng-electric-showcases-grid-forming-technology-and-solar-storage-hydrogen-solutions-at-rei/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-f0b023f6527b" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a></p>
 <p class="feat"><span class="lbl">特点</span> 液冷不再只服务电池柜，PCS 功率器件也被纳入同一热管理设计，结构上需要同步处理冷板、管路、泄漏防护和功率模块可维护性。</p>
 </article><article class="entry">
 <h3 class="entry-head"><span class="idx">4</span><span class="vendor">TCL Sunpower</span><span class="dash"> —— </span><span class="etitle">X5 以预装配混合柜降低现场接线量</span></h3>
@@ -382,7 +402,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>环境适应性</strong>：工作温度范围为 −60°C 至 50°C。</li>
 <li><strong>缺口</strong>：未公开单柜尺寸、重量、电芯型号、液冷或风冷方式、循环寿命及价格。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://www.pv-magazine.com/2026/10/22/tcl-sunpower-launches-hybrid-energy-storage-cabinet-for-ci-applications/" target="_blank" rel="noopener noreferrer">pv magazine</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.pv-magazine.com/2026/10/22/tcl-sunpower-launches-hybrid-energy-storage-cabinet-for-ci-applications/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e16a3afd6d67" data-goatcounter-title="pv magazine">pv magazine</a></p>
 <p class="feat"><span class="lbl">特点</span> X5 的结构价值在于把现场电气装配前移至工厂，设计时应优先保证线束、母排、逆变器和电池柜体的模块化装配及运输约束。</p>
 </article><article class="entry">
 <h3 class="entry-head"><span class="idx">5</span><span class="vendor">Jinko ESS</span><span class="dash"> —— </span><span class="etitle">Tera 镜像柜布局将占地和直流线缆进一步压缩</span></h3>
@@ -394,7 +414,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>缺口</strong>：本次项目披露未新增单柜尺寸、重量、IP 等级、液冷参数或循环寿命。</li>
 <li><strong>结构边界</strong>：镜像柜布局对柜间维护面、直流汇流路径和吊装定位提出了更强的现场规划要求，但报道未给出具体净距。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://www.energy-storage.news/industry-updates/jinko-ess-powers-135mwh-green-battery-energy-storage-project-in-germany/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.energy-storage.news/industry-updates/jinko-ess-powers-135mwh-green-battery-energy-storage-project-in-germany/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-bb8cd84323fa" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a></p>
 <p class="feat"><span class="lbl">特点</span> 该方案通过柜体镜像和直流路径缩短降低场站占地与布线量，结构设计不能只优化单柜体积，还要把柜间连接和检修面作为整体布局变量。</p>
 </article></section><section class="card" id="sec-3"><div class="sec-head"><span class="sec-num">三</span><span class="sec-title">电池与材料技术突破</span><span class="sec-count">3 条</span></div><article class="entry">
 <h3 class="entry-head"><span class="idx">1</span><span class="vendor">Dow</span><span class="dash"> —— </span><span class="etitle">VOLTRICELL 将电芯材料与热防护材料放入统一平台</span></h3>
@@ -406,7 +426,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>工艺缺口</strong>：报道未公开 TP1415 的阻燃等级、屈服或拉伸指标，未公开 EF-6559 的膨胀倍率、导热系数、固化窗口及 FC-2024 的涂层厚度。</li>
 <li><strong>结构影响</strong>：材料可覆盖复合壳体、窄间隙隔热和箱体表面防护，但目前不足以据此确定板厚、间隙或灌封设计。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://rubberworld.com/dow-launches-voltricell-battery-cell-materials-platform/" target="_blank" rel="noopener noreferrer">RubberWorld</a> ｜ <a href="https://finance.yahoo.com/technology/articles/dow-launches-voltricell-battery-cell-materials-platform-121500783.html" target="_blank" rel="noopener noreferrer">Yahoo Finance</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://rubberworld.com/dow-launches-voltricell-battery-cell-materials-platform/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-2c335d7e8ee8" data-goatcounter-title="RubberWorld">RubberWorld</a> ｜ <a href="https://finance.yahoo.com/technology/articles/dow-launches-voltricell-battery-cell-materials-platform-121500783.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-c74e5df59c32" data-goatcounter-title="Yahoo Finance">Yahoo Finance</a></p>
 <p class="feat"><span class="lbl">特点</span> Dow 的路线是把阻燃、隔热和壳体防护从独立零件转向材料系统协同，但公开指标尚不足以直接导入结构件设计规范。</p>
 </article><article class="entry">
 <h3 class="entry-head"><span class="idx">2</span><span class="vendor">PACT</span><span class="dash"> —— </span><span class="etitle">Thermo Shield 通过薄层电芯包覆抑制热失控传播</span></h3>
@@ -418,7 +438,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>适配性</strong>：厂商称其可用于不同电芯结构，但报道未公开具体 UL94 等级、压实密度、长期压缩蠕变和绝缘耐压数据。</li>
 <li><strong>缺口</strong>：未公开热阻、面内/厚向导热系数、循环后尺寸变化、胶黏方式及量产工艺窗口。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://patch.com/new-york/new-york-city/ct-manufacturer-shines-national-battery-industry-forum-detroit" target="_blank" rel="noopener noreferrer">Patch</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://patch.com/new-york/new-york-city/ct-manufacturer-shines-national-battery-industry-forum-detroit" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-772a34f2cd24" data-goatcounter-title="Patch">Patch</a></p>
 <p class="feat"><span class="lbl">特点</span> 若薄层隔热材料能够保持长期尺寸稳定，Pack 可减少传统隔板和灌封占用，但压紧力、热膨胀和绝缘可靠性仍需通过整包验证。</p>
 </article><article class="entry">
 <h3 class="entry-head"><span class="idx">3</span><span class="vendor">CATL</span><span class="dash"> —— </span><span class="etitle">钠离子电芯继续以低温性能换取较低能量密度</span></h3>
@@ -430,7 +450,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>结构影响</strong>：在相同储能容量下，较低的质量能量密度会增加 Pack 体积或重量；低温性能则可能减少极寒场景下的加热系统需求。</li>
 <li><strong>缺口</strong>：本周期报道未公开 TENER Sodium 的单体尺寸、重量、压实密度、循环寿命、Pack 能量密度、IP 等级及价格。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://www.energy-storage.news/catl-holds-global-launch-for-9mwh-tener-bess-at-all-energy-australia-signs-pcs-agreement-with-hitachi-energy/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a> ｜ <a href="https://www.iea.org/commentaries/sodium-ion-battery-momentum-grows-but-challenges-remain" target="_blank" rel="noopener noreferrer">IEA</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.energy-storage.news/catl-holds-global-launch-for-9mwh-tener-bess-at-all-energy-australia-signs-pcs-agreement-with-hitachi-energy/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-515d1bc830d1" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a> ｜ <a href="https://www.iea.org/commentaries/sodium-ion-battery-momentum-grows-but-challenges-remain" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-cb3b9fbee76e" data-goatcounter-title="IEA">IEA</a></p>
 <p class="feat"><span class="lbl">特点</span> 钠离子储能的结构取舍是以更大的容量体积或系统重量换取低温适应性，当前公开信息尚不足以判断其对家储柜体尺寸的实际影响。</p>
 </article></section><section class="card" id="sec-4"><div class="sec-head"><span class="sec-num">四</span><span class="sec-title">安规与政策大事件</span><span class="sec-count">3 个地区</span></div><article class="entry">
 <h3 class="entry-head"><span class="rbadge">北美</span></h3>
@@ -441,7 +461,7 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>结构影响</strong>：电池、PCS、固件、通信协议或关键电气额定值变化，可能使既有兼容组合失效或触发追加评估，结构和电气变更需同步冻结。</li>
 <li><strong>缺口</strong>：UL 尚未公开该路径对应的首批认证产品、测试成本、周期、Product iQ 分类代码及新增 PCS 型号的具体流程。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://www.energyplanet.global/news/72" target="_blank" rel="noopener noreferrer">Energy Planet</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.energyplanet.global/news/72" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-ee5fda249ef8" data-goatcounter-title="Energy Planet">Energy Planet</a></p>
 <p class="feat"><span class="lbl">特点</span> 北美认证正在把“电池与 PCS 能否组合使用”从项目文件问题转为可查询的具体型号组合问题，硬件设计需提前建立兼容配置清单。</p>
 </article><article class="entry">
 <h3 class="entry-head"><span class="rbadge">欧洲</span></h3>
@@ -452,12 +472,12 @@ section[id] { scroll-margin-top: 16px; }
 <li><strong>回收责任</strong>：欧盟电池法规要求生产者承担废旧电池回收与处理体系责任，分销商需按规定免费回收废旧电池。</li>
 <li><strong>结构影响</strong>：寿命、衰减、效率和可维修/回收信息将不再只是售后资料，结构设计需预留型号识别、拆解、维修和电池护照数据关联所需的可追溯性。</li>
 </ul>
-<p class="src"><span class="lbl">来源</span> <a href="https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=PI_COM:Ares(2026" target="_blank" rel="noopener noreferrer">EUR-Lex</a>9188325) ｜ <a href="https://single-market-economy.ec.europa.eu/single-market/digital-product-passport/batteries_en" target="_blank" rel="noopener noreferrer">European Commission</a> ｜ <a href="https://eur-lex.europa.eu/eli/reg/2023/1542/2026-08-13/eng" target="_blank" rel="noopener noreferrer">EUR-Lex</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=PI_COM:Ares(2026" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-a02cf7628c0a" data-goatcounter-title="EUR-Lex">EUR-Lex</a>9188325) ｜ <a href="https://single-market-economy.ec.europa.eu/single-market/digital-product-passport/batteries_en" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-722443ef408e" data-goatcounter-title="European Commission">European Commission</a> ｜ <a href="https://eur-lex.europa.eu/eli/reg/2023/1542/2026-08-13/eng" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-639b5705c3f1" data-goatcounter-title="EUR-Lex">EUR-Lex</a></p>
 <p class="feat"><span class="lbl">特点</span> 欧洲对储能结构的约束正在从安全和性能扩展到全生命周期，Pack 的可拆解、可识别和可回收性需要在初始结构定义阶段固化。</p>
 </article><article class="entry">
 <h3 class="entry-head"><span class="rbadge">日本</span></h3>
 <p>本周期未检索到 2026-10-19 至 2026-11-02 期间可核实、且同时涉及储能产品认证、关税/供应链政策及安装维护要求的日本新增官方详情页动态。</p>
-<p class="src"><span class="lbl">来源</span> <a href="https://www.meti.go.jp/english/policy/economy/consumer/pse/index.html" target="_blank" rel="noopener noreferrer">日本经济产业省 METI</a></p>
+<p class="src"><span class="lbl">来源</span> <a href="https://www.meti.go.jp/english/policy/economy/consumer/pse/index.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-3d98e2526532" data-goatcounter-title="日本经济产业省 METI">日本经济产业省 METI</a></p>
 <p class="feat"><span class="lbl">特点</span> 现有可核实资料主要是既有 PSE 技术要求和自检记录义务，未形成可纳入本期的窗口内新增政策事件。</p>
 </article></section><section class="card" id="sec-5"><div class="sec-head"><span class="sec-num">五</span><span class="sec-title">对华宝新能（Jackery）结构与产品定义的启发</span><span class="sec-count">3 点建议</span></div>
 <ol class="advice">
@@ -476,62 +496,62 @@ section[id] { scroll-margin-top: 16px; }
 <h2 id="p-1">一、便携&amp;阳台储能竞品动态</h2>
 <h3>1. <strong>BLUETTI</strong> —— Apex 200 将 2.56kWh 便携电源压缩至 27kg 级</h3>
 <ul><li><strong>规格</strong>：Apex 200 配置 2.56kWh 电池，独立运行持续交流输出 3,200W；接入扩展电池或在交流/光伏输入工作时，输出最高 3,600W。</li><li><strong>结构变化</strong>：相较 Apex 300，重量由 38kg 降至 27kg，下降约 29%；体积缩小约 34%，容量减少约 200Wh。</li><li><strong>接口与架构</strong>：机身集成 10 个输出端口，包括 100W 与 140W USB-C、两个 15W USB-A 及四个可独立控制的交流插座；直流端口不再依赖扩展单元。</li><li><strong>扩展</strong>：兼容扩展电池后，单机容量最高可扩展至 33.28kWh；三台系统并联时，厂商宣称总容量约 100kWh、输出最高 6kW。</li><li><strong>充电</strong>：交流快充可在 46 分钟充至 80%。</li><li><strong>缺口</strong>：截至报道时，未公开正式价格、整机尺寸、IP 防护等级和循环寿命。</li></ul>
-<p><strong>来源</strong>：<a href="https://www.ess-news.com/2026/10/23/bluetti-launching-apex-200-with-2-56-kwh-capacity-and-a-huge-drop-in-size-and-weight-from-apex-300/" target="_blank" rel="noopener noreferrer">ESS News</a> ｜ <a href="https://en.best-batteries.com/product-launches/" target="_blank" rel="noopener noreferrer">Best Batteries</a></p>
+<p><strong>来源</strong>：<a href="https://www.ess-news.com/2026/10/23/bluetti-launching-apex-200-with-2-56-kwh-capacity-and-a-huge-drop-in-size-and-weight-from-apex-300/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-8563b99817e3" data-goatcounter-title="ESS News">ESS News</a> ｜ <a href="https://en.best-batteries.com/product-launches/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-702571be4d4b" data-goatcounter-title="Best Batteries">Best Batteries</a></p>
 <p><strong>特点</strong>：Apex 200 的结构路线是以明显减重和缩容换取可搬运性，同时保留高功率输出与大容量扩展能力。</p>
 <h3>2. <strong>DJI Power</strong> —— Power Auro 2000 Elite 将充电模块内置到约 19kg 的 2kWh 机身</h3>
 <ul><li><strong>规格</strong>：Power Auro 2000 Elite 采用 LFP 电芯，容量约 2kWh，持续输出 2,000W，峰值输出 2,200W。</li><li><strong>结构变化</strong>：相较 DJI Power 2000，体积缩小 24%，重量减少 14%，约为 19kg；报道未给出两代产品的具体长宽高。</li><li><strong>接口与架构</strong>：采用一体化设计，将 600W 车充、600W MPPT、140W 可伸缩线缆和双 SDC 接口集成到主机，所有主要接口集中在前侧。</li><li><strong>扩展与场景</strong>：通过后续扩展电池可扩展至 12kWh；与太阳能板和微型逆变器组合后，在部分地区支持最高 800W 并网运行。</li><li><strong>充电与维护</strong>：交流输入最高 2,000W，0% 至 80% 约需 60 分钟；双 SDC 光伏输入合计最高 1,200W；支持 DJI Home App 监控。</li><li><strong>价格与缺口</strong>：欧洲售价 1,099 欧元，提供五年质保；未披露 IP 防护等级、循环寿命和完整尺寸。</li></ul>
-<p><strong>来源</strong>：<a href="https://www.pv-magazine.com/2026/10/29/dji-power-launches-new-auro-2000-elite-as-its-most-compact-2-kwh-power-station/" target="_blank" rel="noopener noreferrer">pv magazine</a> ｜ <a href="https://www.prnewswire.com/news-releases/new-dji-power-auro-2000-elite-packs-car-charging-and-solar-benefits-into-djis-most-compact-2kwh-power-station-302923109.html" target="_blank" rel="noopener noreferrer">PR Newswire</a></p>
+<p><strong>来源</strong>：<a href="https://www.pv-magazine.com/2026/10/29/dji-power-launches-new-auro-2000-elite-as-its-most-compact-2-kwh-power-station/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-02b2d68a931e" data-goatcounter-title="pv magazine">pv magazine</a> ｜ <a href="https://www.prnewswire.com/news-releases/new-dji-power-auro-2000-elite-packs-car-charging-and-solar-benefits-into-djis-most-compact-2kwh-power-station-302923109.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-bfb1e340fe3b" data-goatcounter-title="PR Newswire">PR Newswire</a></p>
 <p><strong>特点</strong>：DJI Power 把车充、MPPT 和线缆收纳从外置附件转为机内集成，结构重点转向前侧接口集中与充电链路的一体化。</p>
 <h3>3. <strong>Hoymiles</strong> —— HiOne 在澳大利亚展出 8–64kWh 可堆叠家储架构</h3>
 <ul><li><strong>规格</strong>：HiOne 将逆变器、电池和能源管理系统集成在一套家用储能系统中，堆叠容量范围为 8–64kWh。</li><li><strong>结构变化</strong>：采用模块化堆叠设计，以电池模块数量适配不同家庭容量需求；本次展出未披露模块尺寸、单模块重量或堆叠高度。</li><li><strong>接口与架构</strong>：HiSwitch 为紧凑型 DIN 导轨安装设备，集成五项功能；HiBox 用于系统扩展，并可与兼容的第三方发电机和光伏逆变器连接。</li><li><strong>并离网切换</strong>：HiSwitch 与 HiBox 配合支持离网切换和全屋备电，系统架构不再局限于单一光伏逆变器配套。</li><li><strong>缺口</strong>：未公开 HiOne 的 IP 防护等级、循环寿命、单模块容量、整机尺寸、重量和价格。</li></ul>
-<p><strong>来源</strong>：<a href="https://www.hoymiles.com/product-release.html" target="_blank" rel="noopener noreferrer">Hoymiles</a> ｜ <a href="https://www.aap.com.au/aapreleases/cision20261029ae84505/" target="_blank" rel="noopener noreferrer">AAP / PR Newswire</a></p>
+<p><strong>来源</strong>：<a href="https://www.hoymiles.com/product-release.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-945e212ce953" data-goatcounter-title="Hoymiles">Hoymiles</a> ｜ <a href="https://www.aap.com.au/aapreleases/cision20261029ae84505/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-56e38653d55d" data-goatcounter-title="AAP / PR Newswire">AAP / PR Newswire</a></p>
 <p><strong>特点</strong>：HiOne 的核心不是单机便携化，而是通过堆叠电池、DIN 导轨控制单元和扩展盒拆分安装边界，降低不同家庭容量段的结构复用成本。</p>
 <h2 id="p-2">二、户用&amp;工商业储能与大机动态</h2>
 <h3>1. <strong>Hoymiles</strong> —— HoyUltra 2,000M 将 2MWh 级工商业储能集成进液冷集装箱</h3>
 <ul><li><strong>规格</strong>：HoyUltra 2,000M 提供 2MWh、2.61MWh 等 15 种配置，额定交流输出覆盖 500kW 至 1.25MW。</li><li><strong>接口与架构</strong>：支持 380/400V、690V 和 800V 交流电压等级，系统集成电池、PCS、热管理、静态切换开关和消防设备。</li><li><strong>结构变化</strong>：采用集装箱化一体架构，所有配置尺寸为 6,058mm × 2,591mm × 2,438mm，重量为 22,700kg 至 26,000kg。</li><li><strong>热管理</strong>：电池和 PCS 均采用液冷，工作温度范围为 −30°C 至 55°C，环境温度不超过 50°C 时维持额定功率。</li><li><strong>防护与消防</strong>：机柜防护等级为 IP55，具备 C5 防腐蚀等级；集成烟雾与温度探测、灭火、联锁通风和舱体泄爆装置。</li><li><strong>缺口</strong>：报道未公开单柜电芯规格、液冷回路压力与流量、循环寿命及系统价格。</li></ul>
-<p><strong>来源</strong>：<a href="http://www.pv-magazine.com/2026/10/21/hoymiles-releases-a-2000-kwh-ci-energy-storage-solution/" target="_blank" rel="noopener noreferrer">pv magazine</a></p>
+<p><strong>来源</strong>：<a href="http://www.pv-magazine.com/2026/10/21/hoymiles-releases-a-2000-kwh-ci-energy-storage-solution/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-51cc661ed2ab" data-goatcounter-title="pv magazine">pv magazine</a></p>
 <p><strong>特点</strong>：该方案把电池、PCS、液冷、STS 和消防边界收进同一集装箱，结构设计重点从单一电池柜转向高压交流接口、舱内分区和泄爆路径协同。</p>
 <h3>2. <strong>CATL</strong> —— TENER+ 以 9MWh 单系统容量压缩集装箱数量和场站占地</h3>
 <ul><li><strong>规格</strong>：TENER+ 单系统容量为 9MWh，厂商宣称可使集装箱数量减少 40%、项目占地减少 35%。</li><li><strong>结构与集成</strong>：采用液冷架构，面向高容量直流储能系统与外部 PCS 的组合部署。</li><li><strong>声学与寿命</strong>：设计寿命为 25 年，运行噪声低于 65dBA。</li><li><strong>电网友好性</strong>：CATL 将构网型能力作为大规模储能应用方向，并与 Hitachi Energy 签署 PCS 协作协议，目标是提高直流电池系统与 PCS 的兼容性。</li><li><strong>系统边界</strong>：本次披露重点在电池侧系统和 PCS 适配，未公开完整集装箱尺寸、整机重量、IP 等级和液冷参数。</li><li><strong>缺口</strong>：未公开 TENER+ 的具体电芯容量、Pack 排布、消防系统细节、循环寿命及价格。</li></ul>
-<p><strong>来源</strong>：<a href="https://www.energy-storage.news/catl-holds-global-launch-for-9mwh-tener-bess-at-all-energy-australia-signs-pcs-agreement-with-hitachi-energy/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a></p>
+<p><strong>来源</strong>：<a href="https://www.energy-storage.news/catl-holds-global-launch-for-9mwh-tener-bess-at-all-energy-australia-signs-pcs-agreement-with-hitachi-energy/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-515d1bc830d1" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a></p>
 <p><strong>特点</strong>：TENER+ 的结构路线是通过提高单箱容量减少基础、吊装和直流连接数量，但其对箱内热失控分区及维护通道的具体影响仍缺少公开数据。</p>
 <h3>3. <strong>Sineng Electric</strong> —— 液冷组串 PCS 将构网型控制与热管理集成</h3>
 <ul><li><strong>规格</strong>：Sineng 展示 1.25/1.725MW 集中式 PCS 和 430kW 液冷构网型组串 PCS。</li><li><strong>构网能力</strong>：集中式 PCS 支持弱电网构网运行，适用短路比 SCR≥1.1，具备 1.5 倍额定电流、持续 10 秒的过载能力。</li><li><strong>控制架构</strong>：支持可调惯量响应、宽频阻抗调节、场站级黑启动，以及构网与跟网模式无缝切换。</li><li><strong>热管理</strong>：430kW 组串 PCS 采用液冷，并结合簇级能源管理。</li><li><strong>效率影响</strong>：厂商宣称液冷设计可使辅助功耗降低 30%，满载 IGBT 温升降低 5K。</li><li><strong>缺口</strong>：未公开 PCS 外形尺寸、重量、IP 等级、液冷介质、流量和维护周期。</li></ul>
-<p><strong>来源</strong>：<a href="https://www.energy-storage.news/industry-updates/sineng-electric-showcases-grid-forming-technology-and-solar-storage-hydrogen-solutions-at-rei/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a></p>
+<p><strong>来源</strong>：<a href="https://www.energy-storage.news/industry-updates/sineng-electric-showcases-grid-forming-technology-and-solar-storage-hydrogen-solutions-at-rei/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-f0b023f6527b" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a></p>
 <p><strong>特点</strong>：液冷不再只服务电池柜，PCS 功率器件也被纳入同一热管理设计，结构上需要同步处理冷板、管路、泄漏防护和功率模块可维护性。</p>
 <h3>4. <strong>TCL Sunpower</strong> —— X5 以预装配混合柜降低现场接线量</h3>
 <ul><li><strong>规格</strong>：X5 基础单元为 50kW/100kWh，最多四台并联后扩展至 400kWh。</li><li><strong>接口与架构</strong>：机柜内置 50kW 逆变器，采用工厂预装、预接线交付。</li><li><strong>制造与安装</strong>：厂商宣称相较现场组装系统，预装方案可使安装成本降低最多 60%。</li><li><strong>防护</strong>：逆变器防护等级为 IP66，整柜防护等级为 IP55。</li><li><strong>环境适应性</strong>：工作温度范围为 −60°C 至 50°C。</li><li><strong>缺口</strong>：未公开单柜尺寸、重量、电芯型号、液冷或风冷方式、循环寿命及价格。</li></ul>
-<p><strong>来源</strong>：<a href="https://www.pv-magazine.com/2026/10/22/tcl-sunpower-launches-hybrid-energy-storage-cabinet-for-ci-applications/" target="_blank" rel="noopener noreferrer">pv magazine</a></p>
+<p><strong>来源</strong>：<a href="https://www.pv-magazine.com/2026/10/22/tcl-sunpower-launches-hybrid-energy-storage-cabinet-for-ci-applications/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e16a3afd6d67" data-goatcounter-title="pv magazine">pv magazine</a></p>
 <p><strong>特点</strong>：X5 的结构价值在于把现场电气装配前移至工厂，设计时应优先保证线束、母排、逆变器和电池柜体的模块化装配及运输约束。</p>
 <h3>5. <strong>Jinko ESS</strong> —— Tera 镜像柜布局将占地和直流线缆进一步压缩</h3>
 <ul><li><strong>结构变化</strong>：Jinko Tera 5.01MWh 液冷系统采用镜像 AB 柜布局，厂商宣称项目占地减少 17.7%。</li><li><strong>接口架构</strong>：同一方案宣称直流线缆减少 50%，用于缩短现场交付和并网连接周期。</li><li><strong>效率</strong>：披露的转换效率为 94.1%。</li><li><strong>系统应用</strong>：该架构用于德国 135MWh 光储项目，与光伏电站和混合 PPA 配套。</li><li><strong>缺口</strong>：本次项目披露未新增单柜尺寸、重量、IP 等级、液冷参数或循环寿命。</li><li><strong>结构边界</strong>：镜像柜布局对柜间维护面、直流汇流路径和吊装定位提出了更强的现场规划要求，但报道未给出具体净距。</li></ul>
-<p><strong>来源</strong>：<a href="https://www.energy-storage.news/industry-updates/jinko-ess-powers-135mwh-green-battery-energy-storage-project-in-germany/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a></p>
+<p><strong>来源</strong>：<a href="https://www.energy-storage.news/industry-updates/jinko-ess-powers-135mwh-green-battery-energy-storage-project-in-germany/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-bb8cd84323fa" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a></p>
 <p><strong>特点</strong>：该方案通过柜体镜像和直流路径缩短降低场站占地与布线量，结构设计不能只优化单柜体积，还要把柜间连接和检修面作为整体布局变量。</p>
 <h2 id="p-3">三、电池与材料技术突破</h2>
 <h3>1. <strong>Dow</strong> —— VOLTRICELL 将电芯材料与热防护材料放入统一平台</h3>
 <ul><li><strong>电芯与材料</strong>：VOLTRICELL 覆盖电极、隔膜、涂层和电芯封装材料，面向锂离子、钠离子、硅负极和固态电池。</li><li><strong>结构材料</strong>：配套 VORAFORCE TP1415 聚氨酯树脂，用于轻量化纤维增强复合材料，并兼顾冲击、耐腐蚀和阻燃性能。</li><li><strong>隔热材料</strong>：DOWSIL EF-6559 为双组分膨胀硅泡沫，适用于电池组件中的狭窄和复杂空间，受高温后形成陶瓷化保护层。</li><li><strong>壳体防护</strong>：DOWSIL FC-2024 为单组分 RTV 涂层，可用于电池壳体、箱体和上盖，在热事件中形成硬质陶瓷保护层。</li><li><strong>工艺缺口</strong>：报道未公开 TP1415 的阻燃等级、屈服或拉伸指标，未公开 EF-6559 的膨胀倍率、导热系数、固化窗口及 FC-2024 的涂层厚度。</li><li><strong>结构影响</strong>：材料可覆盖复合壳体、窄间隙隔热和箱体表面防护，但目前不足以据此确定板厚、间隙或灌封设计。</li></ul>
-<p><strong>来源</strong>：<a href="https://rubberworld.com/dow-launches-voltricell-battery-cell-materials-platform/" target="_blank" rel="noopener noreferrer">RubberWorld</a> ｜ <a href="https://finance.yahoo.com/technology/articles/dow-launches-voltricell-battery-cell-materials-platform-121500783.html" target="_blank" rel="noopener noreferrer">Yahoo Finance</a></p>
+<p><strong>来源</strong>：<a href="https://rubberworld.com/dow-launches-voltricell-battery-cell-materials-platform/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-2c335d7e8ee8" data-goatcounter-title="RubberWorld">RubberWorld</a> ｜ <a href="https://finance.yahoo.com/technology/articles/dow-launches-voltricell-battery-cell-materials-platform-121500783.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-c74e5df59c32" data-goatcounter-title="Yahoo Finance">Yahoo Finance</a></p>
 <p><strong>特点</strong>：Dow 的路线是把阻燃、隔热和壳体防护从独立零件转向材料系统协同，但公开指标尚不足以直接导入结构件设计规范。</p>
 <h3>2. <strong>PACT</strong> —— Thermo Shield 通过薄层电芯包覆抑制热失控传播</h3>
 <ul><li><strong>材料形态</strong>：PACT Thermo Shield 为纸基多层材料，通过在单层纸上施加四层特殊油墨，用于包覆单体电芯。</li><li><strong>热防护</strong>：TR Sleeve 可承受最高 1,382°F 的热事件，厂商定位为降低电芯之间的热失控传播。</li><li><strong>厚度影响</strong>：报道给出的额外厚度为 0.009 英寸，即约 0.229mm。</li><li><strong>结构影响</strong>：该方案主张在不采用灌封材料和传统隔板的情况下实现电芯间防护，使电芯能够更紧密地压紧或堆叠。</li><li><strong>适配性</strong>：厂商称其可用于不同电芯结构，但报道未公开具体 UL94 等级、压实密度、长期压缩蠕变和绝缘耐压数据。</li><li><strong>缺口</strong>：未公开热阻、面内/厚向导热系数、循环后尺寸变化、胶黏方式及量产工艺窗口。</li></ul>
-<p><strong>来源</strong>：<a href="https://patch.com/new-york/new-york-city/ct-manufacturer-shines-national-battery-industry-forum-detroit" target="_blank" rel="noopener noreferrer">Patch</a></p>
+<p><strong>来源</strong>：<a href="https://patch.com/new-york/new-york-city/ct-manufacturer-shines-national-battery-industry-forum-detroit" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-772a34f2cd24" data-goatcounter-title="Patch">Patch</a></p>
 <p><strong>特点</strong>：若薄层隔热材料能够保持长期尺寸稳定，Pack 可减少传统隔板和灌封占用，但压紧力、热膨胀和绝缘可靠性仍需通过整包验证。</p>
 <h3>3. <strong>CATL</strong> —— 钠离子电芯继续以低温性能换取较低能量密度</h3>
 <ul><li><strong>电芯体系</strong>：CATL Naxtra 钠离子电芯公开能量密度上限为 175Wh/kg。</li><li><strong>对比基准</strong>：IEA 给出的最新 LFP 电芯能量密度上限约为 205Wh/kg，钠离子仍低于主流高能量密度 LFP。</li><li><strong>低温性能</strong>：CATL 表示 Naxtra 在 −40°C 时容量保持率超过 90%。</li><li><strong>系统方向</strong>：CATL 已在澳大利亚全球发布 TENER Sodium，并将钠离子路线延伸至储能应用。</li><li><strong>结构影响</strong>：在相同储能容量下，较低的质量能量密度会增加 Pack 体积或重量；低温性能则可能减少极寒场景下的加热系统需求。</li><li><strong>缺口</strong>：本周期报道未公开 TENER Sodium 的单体尺寸、重量、压实密度、循环寿命、Pack 能量密度、IP 等级及价格。</li></ul>
-<p><strong>来源</strong>：<a href="https://www.energy-storage.news/catl-holds-global-launch-for-9mwh-tener-bess-at-all-energy-australia-signs-pcs-agreement-with-hitachi-energy/" target="_blank" rel="noopener noreferrer">Energy-Storage.News</a> ｜ <a href="https://www.iea.org/commentaries/sodium-ion-battery-momentum-grows-but-challenges-remain" target="_blank" rel="noopener noreferrer">IEA</a></p>
+<p><strong>来源</strong>：<a href="https://www.energy-storage.news/catl-holds-global-launch-for-9mwh-tener-bess-at-all-energy-australia-signs-pcs-agreement-with-hitachi-energy/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-515d1bc830d1" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a> ｜ <a href="https://www.iea.org/commentaries/sodium-ion-battery-momentum-grows-but-challenges-remain" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-cb3b9fbee76e" data-goatcounter-title="IEA">IEA</a></p>
 <p><strong>特点</strong>：钠离子储能的结构取舍是以更大的容量体积或系统重量换取低温适应性，当前公开信息尚不足以判断其对家储柜体尺寸的实际影响。</p>
 <h2 id="p-4">四、安规与政策大事件</h2>
 <p><strong>北美</strong></p>
 <ul><li><strong>认证</strong>：UL Solutions 于 10 月 20 日宣布面向模块化直流储能系统及指定 PCS 的新认证路径，按 UL 9540 对电池系统与具体子系统组合进行评估，并将已验证组合记录至 Product iQ。</li><li><strong>系统边界</strong>：单独通过 UL 1973 的电池或单独通过 UL 1741 的 PCS，并不自动构成 UL 9540 合规系统；短路额定值、保护功能、BMS 通信、故障隔离和控制逻辑仍需按具体组合评估。</li><li><strong>安装要求</strong>：该路径不会替代当地电气、消防和建筑规范，也不等于项目自动获批，最终仍由当地主管机构审查。</li><li><strong>结构影响</strong>：电池、PCS、固件、通信协议或关键电气额定值变化，可能使既有兼容组合失效或触发追加评估，结构和电气变更需同步冻结。</li><li><strong>缺口</strong>：UL 尚未公开该路径对应的首批认证产品、测试成本、周期、Product iQ 分类代码及新增 PCS 型号的具体流程。</li></ul>
-<p><strong>来源</strong>：<a href="https://www.energyplanet.global/news/72" target="_blank" rel="noopener noreferrer">Energy Planet</a></p>
+<p><strong>来源</strong>：<a href="https://www.energyplanet.global/news/72" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-ee5fda249ef8" data-goatcounter-title="Energy Planet">Energy Planet</a></p>
 <p><strong>特点</strong>：北美认证正在把“电池与 PCS 能否组合使用”从项目文件问题转为可查询的具体型号组合问题，硬件设计需提前建立兼容配置清单。</p>
 <p><strong>欧洲</strong></p>
 <ul><li><strong>性能要求</strong>：欧盟委员会发布的电池法规授权文件提出，住宅储能电池的容量衰减应低于 4%，预期寿命应超过 3,000 次等效满充满放循环，往返效率应高于 93%。</li><li><strong>适用范围</strong>：要求针对容量超过 2kWh 的可充电工业电池，并覆盖住宅储能系统等类别；正式实施时间以欧盟官方公报发布及法规生效条款为准。</li><li><strong>数字护照</strong>：欧盟委员会确认，家用储能电池和工业电池属于电池护照适用范围，电池护照将包含技术特性、性能耐久、维修、再利用和回收信息。</li><li><strong>回收责任</strong>：欧盟电池法规要求生产者承担废旧电池回收与处理体系责任，分销商需按规定免费回收废旧电池。</li><li><strong>结构影响</strong>：寿命、衰减、效率和可维修/回收信息将不再只是售后资料，结构设计需预留型号识别、拆解、维修和电池护照数据关联所需的可追溯性。</li></ul>
-<p><strong>来源</strong>：<a href="https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=PI_COM:Ares(2026" target="_blank" rel="noopener noreferrer">EUR-Lex</a>9188325) ｜ <a href="https://single-market-economy.ec.europa.eu/single-market/digital-product-passport/batteries_en" target="_blank" rel="noopener noreferrer">European Commission</a> ｜ <a href="https://eur-lex.europa.eu/eli/reg/2023/1542/2026-08-13/eng" target="_blank" rel="noopener noreferrer">EUR-Lex</a></p>
+<p><strong>来源</strong>：<a href="https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=PI_COM:Ares(2026" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-a02cf7628c0a" data-goatcounter-title="EUR-Lex">EUR-Lex</a>9188325) ｜ <a href="https://single-market-economy.ec.europa.eu/single-market/digital-product-passport/batteries_en" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-722443ef408e" data-goatcounter-title="European Commission">European Commission</a> ｜ <a href="https://eur-lex.europa.eu/eli/reg/2023/1542/2026-08-13/eng" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-639b5705c3f1" data-goatcounter-title="EUR-Lex">EUR-Lex</a></p>
 <p><strong>特点</strong>：欧洲对储能结构的约束正在从安全和性能扩展到全生命周期，Pack 的可拆解、可识别和可回收性需要在初始结构定义阶段固化。</p>
 <p><strong>日本</strong></p>
 <p>本周期未检索到 2026-10-19 至 2026-11-02 期间可核实、且同时涉及储能产品认证、关税/供应链政策及安装维护要求的日本新增官方详情页动态。</p>
-<p><strong>来源</strong>：<a href="https://www.meti.go.jp/english/policy/economy/consumer/pse/index.html" target="_blank" rel="noopener noreferrer">日本经济产业省 METI</a></p>
+<p><strong>来源</strong>：<a href="https://www.meti.go.jp/english/policy/economy/consumer/pse/index.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-3d98e2526532" data-goatcounter-title="日本经济产业省 METI">日本经济产业省 METI</a></p>
 <p><strong>特点</strong>：现有可核实资料主要是既有 PSE 技术要求和自检记录义务，未形成可纳入本期的窗口内新增政策事件。</p>
 <h2 id="p-5">五、对华宝新能（Jackery）结构与产品定义的启发</h2>
 <ol><li><strong>Explorer 系列</strong>应继续把高功率充电模块、MPPT、车充和线缆收纳作为整机结构的一体化对象，而不是通过外置附件扩展功能。竞品路线显示，接口集中、内部高压/低压分区和可维护的前侧布局会直接决定机身厚度、散热路径与装配复杂度。</li></ol>
