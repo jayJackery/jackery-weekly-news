@@ -3051,6 +3051,19 @@ def main() -> int:
     if args.from_report and not inbox.is_file():
         sys.exit(f"❌ --from-report 指向的文件不存在：{inbox}")
 
+    # ⚠️ 预置稿缺失时**默认不再回退 OpenRouter**。
+    # 无人值守下，"模型现写一期"会被当成正常发布送进钉钉群，而那一期从未经过人工审核 ——
+    # 这比"这周没发"更坏：它看起来一切正常，没人会去查。所以默认 fail-loudly。
+    # 要恢复旧的回退行为，必须显式设 ALLOW_OPENROUTER_FALLBACK=1（人工在场的临时路径）。
+    allow_fallback = os.environ.get("ALLOW_OPENROUTER_FALLBACK", "").strip().lower() in {
+        "1", "true", "yes",
+    }
+    if inbox is None and not allow_fallback:
+        sys.exit(
+            f"❌ 未找到本期预置稿 inbox/{date_str}.md，且未开启 ALLOW_OPENROUTER_FALLBACK："
+            f"拒绝由模型现写。请先把稿子写好放进 inbox/ 再运行。"
+        )
+
     cfg = load_config(dry_run=args.dry_run, require_api_key=inbox is None)
     base_url = cfg["SITE_BASE_URL"]
     if not base_url:
@@ -3068,8 +3081,12 @@ def main() -> int:
             inbox.read_text(encoding="utf-8-sig"), today, history
         )
     else:
-        LOG.info("未找到当天预置稿，回退 OpenRouter（%s）：共 3 次调用，板块一两轮 + 其余板块一轮",
-                 cfg["OPENROUTER_MODEL"])
+        # 只有显式开了 ALLOW_OPENROUTER_FALLBACK 才会走到这里：这是人工在场的临时路径。
+        LOG.warning(
+            "未找到当天预置稿，但已显式开启 ALLOW_OPENROUTER_FALLBACK：回退 OpenRouter（%s），"
+            "本期内容**未经人工审核**",
+            cfg["OPENROUTER_MODEL"],
+        )
         report, citations = build_report(cfg, today, history)
     LOG.info("报告生成完毕：%d 字，%d 个引用链接，%d 字节",
              len(report), len(citations), len(report.encode("utf-8")))
