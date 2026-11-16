@@ -384,6 +384,72 @@
         "https://www.ise.fraunhofer.de/en/press-media.html"
       ],
       "pushed": "2026-11-09"
+    },
+    {
+      "title": "EcoFlow —— DELTA Gen4 把 3 kWh 级压到 26 kg，自耗比功率更先被拿来对比",
+      "urls": [
+        "https://www.newswire.ca/fr/news-releases/ecoflow-presents-delta-gen4-series-and-river-gen4-series-in-canada-delivering-longer-lasting-backup-power-in-a-smaller-lighter-design-869431089.html",
+        "https://www.pv-magazine-latam.com/2026/11/10/ecoflow-lanza-las-nuevas-series-delta-gen4-y-river-gen4-en-estados-unidos/"
+      ],
+      "pushed": "2026-11-16"
+    },
+    {
+      "title": "EcoFlow —— RIVER Gen4：512 Wh 机型压到 4.5 kg，140 W 双向 USB-C 成为标配",
+      "urls": [
+        "https://www.newswire.ca/fr/news-releases/ecoflow-presents-delta-gen4-series-and-river-gen4-series-in-canada-delivering-longer-lasting-backup-power-in-a-smaller-lighter-design-869431089.html",
+        "https://www.pv-magazine-latam.com/2026/11/10/ecoflow-lanza-las-nuevas-series-delta-gen4-y-river-gen4-en-estados-unidos/"
+      ],
+      "pushed": "2026-11-16"
+    },
+    {
+      "title": "BLUETTI —— AORA 30 mini 把 140 W 充电线卷进机身，用一个机构件换掉一条易丢的线",
+      "urls": [
+        "https://digimaga.jp/67469/",
+        "https://woodcraft-outdoor.com/news/bluetti-aora-30-mini-2026-11/"
+      ],
+      "pushed": "2026-11-16"
+    },
+    {
+      "title": "能辉科技 —— 捷克 160 MWh 项目群：32 台 5 MWh 液冷舱配 6 台逆变升压一体舱",
+      "urls": [
+        "https://m.energytrend.cn/news/20261111-149204.html"
+      ],
+      "pushed": "2026-11-16"
+    },
+    {
+      "title": "华为 —— Luterra S2：单相 3–10 kW / 三相 5–20 kW，单机堆到 336 kWh",
+      "urls": [
+        "https://www.ess-news.com/2026/11/11/huawei-unveils-20-kw-all-in-one-residential-energy-storage-system/"
+      ],
+      "pushed": "2026-11-16"
+    },
+    {
+      "title": "BigBattery —— RAIO 把 14.7 kWh 与 7.68 kW 逆变器压进 5.9 in 厚壁挂壳",
+      "urls": [
+        "https://www.worldenergynewsonline.com/article/956507414-bigbattery-launches-raio-a-ul-9540-certified-all-in-one-home-energy-storage-system-at-a-disruptive-price-point-for-the-us-market"
+      ],
+      "pushed": "2026-11-16"
+    },
+    {
+      "title": "阳光电源 —— PowerHarbour 模块化户储：10 kWh 一模块叠到 120 kWh，内置 V2G",
+      "urls": [
+        "https://theelectricviking.com/sungrow-reveals-powerharbour-modular-home-battery-with-built-in-v2g-ac-ev-charger/"
+      ],
+      "pushed": "2026-11-16"
+    },
+    {
+      "title": "西安交通大学 / 中科院物理所 —— 无负极钠电软包跑 1,400 圈，−40 ℃ 仍剩 88%",
+      "urls": [
+        "https://innovationessence.com/anode-free-sodium-battery-lasts-1400-cycles-works-at-40c/"
+      ],
+      "pushed": "2026-11-16"
+    },
+    {
+      "title": "都灵理工大学 / BEPA —— 钠电与 LFP 的差距收到约 30 Wh/kg，商用级 5,000 圈仍超 95%",
+      "urls": [
+        "https://www.ess-news.com/2026/11/09/sodium-ion-narrows-the-gap-with-lithium-ion-says-polytechnic-university-of-turin-professor/"
+      ],
+      "pushed": "2026-11-16"
     }
   ]
 }
