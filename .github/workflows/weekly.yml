@@ -11,6 +11,11 @@ on:
     # 已存在或台账已有今日条目时 WARNING + return 0）加上 concurrency 串行化兜住。
     - cron: '45 1 * * 1'
   workflow_dispatch:        # 手动触发（Run workflow 按钮）
+    inputs:
+      force:
+        description: '强制重发：跳过已发布预检与 main.py 重复闸门（确需重发时才勾）'
+        type: boolean
+        default: false
 
 # ⚠️ 一旦声明 permissions，未列出的 scope 全部变 none。这里要写仓库是因为
 # 推送成功之后要把跨周台账 pushed_history.json 提交回去（见最后一步）。
@@ -53,10 +58,44 @@ jobs:
           if git ls-files --error-unmatch Key >/dev/null 2>&1; then
             echo "::error::Key 文件被 git 跟踪，存在密钥泄露风险，已中止"; exit 1
           fi
+      # 预检：本期是否已发布。已发布就整段跳过 —— 不再跑 main.py、不再建站、不再推送。
+      # 这是比 main.py 里 ALLOW_REPUBLISH 更早的一层：省掉一次运行，也让跳过在日志里一眼可见。
+      # 判据与 ALLOW_REPUBLISH 一致：docs/<日期>.md 存在，或台账已有今日条目。
+      # ⚠️ 只读**远端** origin/main，不看本地检出：定时事件排队时 github.sha 可能是旧提交，
+      # 本地 docs/ 会缺这一期，让本该跳过的运行照样跑一遍。
+      # ⚠️ 刻意不写 set -e：这一层只是省一次运行，**不允许它成为新的失败点**。
+      # 任何判不准的情况都落到 published=false，退回原有行为，由 main.py 的闸门兜底。
+      - name: Precheck - 本期是否已发布
+        id: precheck
+        env:
+          FORCE: ${{ inputs.force }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          if [ "${FORCE}" = "true" ]; then
+            echo "手动勾选 force：跳过已发布预检，允许重发"
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # 日期与 main.py 的 date.today() 对齐（runner 是 UTC，09:30 / 09:45 北京 = 同日 UTC）
+          DATE=$(date -u +%F)
+          # 顺手把远端最新 main 拉下来；拉失败就退回本地 origin/main（陈旧但通常仍是对的）。
+          git fetch --no-tags --force origin "main:refs/remotes/origin/main" || echo "fetch 失败，退回本地 origin/main"
+          PUBLISHED=false
+          if git cat-file -e "origin/main:docs/${DATE}.md" 2>/dev/null; then
+            PUBLISHED=true
+            echo "远端已有 docs/${DATE}.md，本期已发布，跳过发布流程"
+          elif git show "origin/main:pushed_history.json" 2>/dev/null | python -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if any(e.get('pushed')=='${DATE}' for e in d.get('entries',[])) else 1)"; then
+            PUBLISHED=true
+            echo "远端台账已有 ${DATE} 条目，本期已发布，跳过发布流程"
+          fi
+          echo "published=${PUBLISHED}" >> "$GITHUB_OUTPUT"
+
 
       # setup-python@v7 移除了 pip-install input，依赖要单独装。
       - run: pip install -r requirements.txt
         id: deps
+        if: steps.precheck.outputs.published == 'false'
 
       - name: Run news bot
         id: run
@@ -73,7 +112,10 @@ jobs:
           SITE_BASE_URL: ${{ vars.SITE_BASE_URL }}
           # GoatCounter 站点编号（公开标识，不是密钥）；未配置时不加载统计脚本。
           GOATCOUNTER_CODE: ${{ vars.GOATCOUNTER_CODE }}
+          # 手动勾选 force 时同步绕过 main.py 的重复闸门（两者同源，别只改一处）。
+          ALLOW_REPUBLISH: ${{ inputs.force }}
         run: python main.py
+        if: steps.precheck.outputs.published == 'false'
 
       # ⚠️ 这一步**故意不加 `if: always()`**。旧版（weekly_news.yml）加了，意味着
       # 推送失败时也提交台账，把从没送达读者的条目标成"已推送" → 下周被永久压制。
@@ -84,6 +126,7 @@ jobs:
       # 成功之后**才写台账，所以这里的文件就是权威记录。
       - name: Commit history ledger and site
         id: commit
+        if: steps.precheck.outputs.published == 'false'
         run: |
           set -euo pipefail
 
