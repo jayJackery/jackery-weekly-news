@@ -6,6 +6,10 @@ on:
     # ⚠️ 改这个时间要同步改三处：这里、README 的「定时任务」表、CLAUDE.md 的
     # 「项目是什么」与「已知陷阱 → GitHub Actions」。漏改不会报错，只会让文档骗人。
     - cron: '30 1 * * 1'
+    # 补偿触发：北京 09:45。09:30 那一枪若被 GitHub 丢弃或长时间延迟，这一枪补上；
+    # 两次都真的跑起来也不会重复发 —— main.py 的 ALLOW_REPUBLISH 闸门（docs/<日期>.md
+    # 已存在或台账已有今日条目时 WARNING + return 0）加上 concurrency 串行化兜住。
+    - cron: '45 1 * * 1'
   workflow_dispatch:        # 手动触发（Run workflow 按钮）
 
 # ⚠️ 一旦声明 permissions，未列出的 scope 全部变 none。这里要写仓库是因为
@@ -67,6 +71,8 @@ jobs:
           # 没配时它展开成**空串**，而 load_config() 把空串当"用默认值"（不是"关闭"），
           # 所以这里留空不会让网页功能静默失效。真要关闭就把变量设成 off。
           SITE_BASE_URL: ${{ vars.SITE_BASE_URL }}
+          # GoatCounter 站点编号（公开标识，不是密钥）；未配置时不加载统计脚本。
+          GOATCOUNTER_CODE: ${{ vars.GOATCOUNTER_CODE }}
         run: python main.py
 
       # ⚠️ 这一步**故意不加 `if: always()`**。旧版（weekly_news.yml）加了，意味着
