@@ -450,6 +450,81 @@
         "https://www.ess-news.com/2026/11/09/sodium-ion-narrows-the-gap-with-lithium-ion-says-polytechnic-university-of-turin-professor/"
       ],
       "pushed": "2026-11-16"
+    },
+    {
+      "title": "GoodWe —— Athena S3 把混合逆变器与电池模块做成盲插堆叠，一人 30 分钟装完",
+      "urls": [
+        "https://priwatt.de/blog/goodwe-athena-s3/",
+        "https://www.ankersolix.com/au/blogs",
+        "https://www.ecoflow.com/eu/stream-series-plug-and-play-solar-battery"
+      ],
+      "pushed": "2026-11-23"
+    },
+    {
+      "title": "海辰储能 HiTHIUM —— ∞Power 6.9+ MWh 用 20 尺柜做原生 8 小时，辅助功耗峰值降 68%",
+      "urls": [
+        "https://www.thebatterymagazine.com/hithium-8-hour-bess-sodium-ion-solutions-re-plus-2026/"
+      ],
+      "pushed": "2026-11-23"
+    },
+    {
+      "title": "海辰储能 HiTHIUM —— 1,022 kWh 液冷柜把 PCS、并离网切换、微网控制器塞进一个柜",
+      "urls": [
+        "https://www.thebatterymagazine.com/hithium-integrated-ci-microgrid-solution-1022-kwh-bess/"
+      ],
+      "pushed": "2026-11-23"
+    },
+    {
+      "title": "阳光电源 —— PowerStack 3.0 用场景拓展坞把工商业柜做成可生长的底座，单位占地 256 kWh/m²",
+      "urls": [
+        "https://m.thepaper.cn/newsDetail_forward_34454239"
+      ],
+      "pushed": "2026-11-23"
+    },
+    {
+      "title": "Moment Energy —— Nova：退役 EV 电池做成 200 kW/500 kWh 模块，换包不拆柜",
+      "urls": [
+        "https://bessnews.com/technology/2026/11/19/moment-energy-introduces-nova-bess-using-repurposed-ev-batteries",
+        "https://electricvehicletalks.com/moment-energy-nova-bess/"
+      ],
+      "pushed": "2026-11-23"
+    },
+    {
+      "title": "国轩高科 —— 35 µm 硫化物电解质上产线，电芯良率过 90%",
+      "urls": [
+        "https://auto.gasgoo.com/news/202611/10I70477482C501.shtml",
+        "https://robotbelt.com/gotion-puts-a-35-micron-sulphide-electrolyte-on-a-pilot-line-16/"
+      ],
+      "pushed": "2026-11-23"
+    },
+    {
+      "title": "QuantumScape —— Osprey 平台：硫化物正极在 1 个大气压下跑 1,000 次",
+      "urls": [
+        "https://ir.quantumscape.com/news-releases/news-release-details/quantumscape-expands-commercial-roadmap-osprey-open-all-solid"
+      ],
+      "pushed": "2026-11-23"
+    },
+    {
+      "title": "金菱通达 GLPOLY —— 可拆卸导热结构胶 XK-R12：剪切强度 3~8 MPa 可调，加热即可脱粘",
+      "urls": [
+        "https://www.glpoly.com.cn/wap.php/article_5151"
+      ],
+      "pushed": "2026-11-23"
+    },
+    {
+      "title": "把单人安装工时写进 Explorer 系列的结构 KPI",
+      "urls": [],
+      "pushed": "2026-11-23"
+    },
+    {
+      "title": "给 HomePower / SolarVault 预留低压紧电芯的结构接口",
+      "urls": [],
+      "pushed": "2026-11-23"
+    },
+    {
+      "title": "让 FridgeGuard 与 SolarSaga 的可维修性可被第三方读到",
+      "urls": [],
+      "pushed": "2026-11-23"
     }
   ]
 }
