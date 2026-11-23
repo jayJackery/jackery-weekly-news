@@ -6,16 +6,28 @@ on:
     # ⚠️ 改这个时间要同步改三处：这里、README 的「定时任务」表、CLAUDE.md 的
     # 「项目是什么」与「已知陷阱 → GitHub Actions」。漏改不会报错，只会让文档骗人。
     - cron: '30 1 * * 1'
-    # 补偿触发：北京 09:45。09:30 那一枪若被 GitHub 丢弃或长时间延迟，这一枪补上；
+    # 补偿触发：北京 09:52。09:30 那一枪若被 GitHub 丢弃或长时间延迟，这一枪补上；
     # 两次都真的跑起来也不会重复发 —— main.py 的 ALLOW_REPUBLISH 闸门（docs/<日期>.md
     # 已存在或台账已有今日条目时 WARNING + return 0）加上 concurrency 串行化兜住。
-    - cron: '45 1 * * 1'
+    # ⚠️ 挪到 :52 只是避开"整点/半点"的排队尖峰，**没离开 UTC 01 点这个高负载窗口**，
+    # 实测 11-09、11-16 都被延迟约 7 小时、11-23 直接丢弃 —— 真正的兜底是下面的 push 触发。
+    - cron: '52 1 * * 1'
   workflow_dispatch:        # 手动触发（Run workflow 按钮）
     inputs:
       force:
         description: '强制重发：跳过已发布预检与 main.py 重复闸门（确需重发时才勾）'
         type: boolean
         default: false
+  # 兜底触发（本地周一 10:00 的「周报投递核验」任务用）：push 事件是**即时派发**，
+  # 不进 schedule 的排队队列，因此不受"高负载延迟数小时 / 直接丢弃"的影响。
+  # 核验任务发现"本期未发布"时，会更新 inbox/.dispatch 再 push 一次，本 workflow 随即被唤醒。
+  # ⚠️ 只匹配这一个路径：写稿提交（inbox/<日期>.md、_sources、_review）与 bot 回写
+  # （docs/、pushed_history.json）都不命中，普通提交不会误触发。
+  # 重复触发是安全的 —— 下面的 Precheck 按 docs/<日期>.md 与台账判定已发布并整段跳过。
+  push:
+    branches: [main]
+    paths:
+      - 'inbox/.dispatch'
 
 # ⚠️ 一旦声明 permissions，未列出的 scope 全部变 none。这里要写仓库是因为
 # 推送成功之后要把跨周台账 pushed_history.json 提交回去（见最后一步）。
