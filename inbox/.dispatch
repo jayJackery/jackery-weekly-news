@@ -1,0 +1,3 @@
+# dispatch trigger：本地核验任务在「本期未发布」时更新本文件以唤醒 GitHub Actions。
+# push 事件即时派发，不进 schedule 排队队列。只放时间戳，禁止写正文与凭据。
+2026-11-23 10:33:02
