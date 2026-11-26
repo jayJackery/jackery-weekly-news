@@ -481,6 +481,184 @@ def extract_entries(report: str) -> list[dict]:
     return entries
 
 
+# 归档页产品标注与新品日历只收板块一（便携&阳台储能竞品动态）。
+# 板块二大机、板块三材料/研究、板块四政策、板块五建议都不进产品表。
+_PRODUCT_SECTIONS = {1}
+
+# 品牌圆点多色相板；主强调色仍是 --accent（华宝橙）。
+_BRAND_PALETTE = [
+    "#bc4c00", "#d97706", "#ca8a04", "#65a30d",
+    "#0891b2", "#7c3aed", "#db2777", "#475569",
+]
+
+# 纯规格单位词不算型号名，归并时剔除。
+_MODEL_UNIT_WORDS = {"wh", "kwh", "kw", "kg", "mwh", "ah", "w", "v", "a", "m"}
+
+
+def _model_phrase(title: str) -> str:
+    """型号展示短语：开头连续的拉丁/数字型号词，遇中文停；没有拉丁词取开头片段。
+
+    "DELTA Gen4 把 3 kWh 级压到 26 kg" → "DELTA Gen4"
+    "RIVER Gen4：512 Wh 机型压到 4.5 kg" → "RIVER Gen4"
+    "Luterra S2：单相 3–10 kW" → "Luterra S2"
+    "6 kWh 插电式 AC 家储…" → 退化为开头中文片段
+    """
+    latin: list[str] = []
+    for tok in title.split():
+        matched = re.match(r"^([A-Za-z0-9][A-Za-z0-9 .+\-/:：,]*)([一-鿿].*)?$", tok)
+        if not matched or not matched.group(1):
+            break
+        latin.append(matched.group(1).strip(" .+-/:,"))
+        if re.search(r"[一-鿿]", tok):
+            break
+    words = [
+        re.split(r"[：:]", t)[0]
+        for t in latin
+        if t.lower() not in _MODEL_UNIT_WORDS
+    ]
+    words = [t for t in words if t]
+    if any(re.search(r"[A-Za-z]", t) for t in words):
+        return " ".join(words).strip(" .+-/:")[:24]
+    return title[:12].strip(" .+-/:")
+
+
+_DATE_ISO = re.compile(r"(20\d{2})-(\d{2})-(\d{2})")
+_DATE_CN = re.compile(r"(\d{1,2})\s*月\s*(\d{1,2})\s*日")
+_DATE_MD = re.compile(r"(?<!\d)(\d{1,2})-(\d{1,2})(?!\d)")
+_DATE_LEAD_RE = re.compile(r"^-\s*\*\*(?:发布|新品|签约|上市|公开)\*\*")
+
+
+def _brand_color(vendor: str) -> str:
+    """按厂商名稳定取色，同一品牌跨期颜色一致。"""
+    h = sum(ord(ch) for ch in vendor.lower())
+    return _BRAND_PALETTE[h % len(_BRAND_PALETTE)]
+
+
+def _extract_release_date(body: list[str], fallback: str) -> tuple[str, str]:
+    """抽条目实际发布日期；抽不到回退到周报日，date_kind 标 fallback。
+
+    优先级：ISO 完整日期 > 「M 月 D 日」> 「M-D」（只在发布/新品等引导行里认）。
+    容量、时间、区间里的假日期靠引导行白名单和数字范围挡掉。
+    """
+    priority = [line.strip() for line in body if _DATE_LEAD_RE.match(line.strip())]
+    for line in priority + body:
+        matched = _DATE_ISO.search(line)
+        if matched:
+            return (
+                f"{matched.group(1)}-{matched.group(2)}-{matched.group(3)}",
+                "release",
+            )
+    for line in priority:
+        matched = _DATE_CN.search(line)
+        if matched:
+            return (
+                f"{fallback[:4]}-{int(matched.group(1)):02d}-{int(matched.group(2)):02d}",
+                "release",
+            )
+    for line in priority:
+        matched = _DATE_MD.search(line)
+        is_review = bool(re.search(r"复核|报道|媒体|撰文|发稿|杂志|新闻稿|记者", line))
+        if (
+            matched
+            and not is_review
+            and 1 <= int(matched.group(1)) <= 12
+            and 1 <= int(matched.group(2)) <= 31
+        ):
+            return (
+                f"{fallback[:4]}-{int(matched.group(1)):02d}-{int(matched.group(2)):02d}",
+                "release",
+            )
+    return fallback, "fallback"
+
+
+def _extract_summary(body: list[str]) -> tuple[str, str]:
+    """取第一条要点作为卡片摘要，另存「特点」行（特点行可能是独立行而非项目符号）。"""
+    point, feature = "", ""
+    for raw in body:
+        s = raw.strip()
+        bullet = s.startswith("- ")
+        text = re.sub(r"\*+", "", s[2:].strip() if bullet else s)
+        if re.match(r"^特点\s*[:：]", text):
+            feature = re.sub(r"^特点\s*[:：]\s*", "", text)
+        elif bullet and not point:
+            point = text
+    point = re.sub(
+        r"^(发布|新品|签约|上市|公开|开售|预订|预告|规格|形态|结构变化|结构|"
+        r"接口与架构|接口|价格|重量|体积|充电路径|自耗|待确认|缺口|容量与功率|"
+        r"重量换算|横向换算|场景|电气|热管理|安全|扩展|数据待确认|寿命与同系列)\s*[:：]\s*",
+        "",
+        point,
+    )
+    return point, feature
+
+
+def collect_products(md: str, report_date: str = "") -> list[dict]:
+    """抽板块一条目的元数据，供归档页标签与新品日历。
+
+    每条记：sec、n（板块内序号）、vendor、phrase（型号短语）、title（纯文本）、
+    anchor（图文版条目锚点 `item-板块-序号`）、date（实际发布日期，缺省回退周报日）、
+    date_kind（release / fallback）、point（首条要点）、feature（特点行）、color（品牌色）。
+    解析不出厂商的条目照样收，vendor 退化为型号短语，不丢内容。
+    """
+    products: list[dict] = []
+    section_order = {heading: i + 1 for i, heading in enumerate(SECTION_HEADINGS)}
+    current_sec = 0
+    counters: dict[int, int] = {}
+    buffer: list[str] | None = None
+
+    def flush() -> None:
+        nonlocal buffer
+        if buffer is None:
+            return
+        head, body = buffer[0].strip(), buffer[1:]
+        buffer = None
+        if current_sec not in _PRODUCT_SECTIONS:
+            return
+        matched_head = _ENTRY_HEAD_RE.match(head)
+        text = matched_head.group(2) if matched_head else head[4:].strip()
+        split = _ENTRY_SPLIT_RE.match(text)
+        if split:
+            vendor = split.group(1).strip()
+            rest = split.group(2).strip()
+        else:
+            vendor = ""
+            rest = re.sub(r"\*+", "", text).strip()
+        counters[current_sec] = counters.get(current_sec, 0) + 1
+        n = counters[current_sec]
+        phrase = _model_phrase(rest)
+        title_plain = re.sub(r"\*+", "", f"{vendor} —— {rest}".strip(" ——")).strip()
+        rel_date, date_kind = _extract_release_date(body, report_date)
+        point, feature = _extract_summary(body)
+        products.append({
+            "sec": current_sec,
+            "n": n,
+            "vendor": vendor or phrase,
+            "phrase": phrase,
+            "title": title_plain,
+            "anchor": f"item-{current_sec}-{n}",
+            "date": rel_date,
+            "date_kind": date_kind,
+            "point": point,
+            "feature": feature,
+            "color": _brand_color(vendor or phrase),
+        })
+
+    for line in md.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            flush()
+            current_sec = section_order.get(stripped, 0)
+            continue
+        if stripped.startswith("### "):
+            flush()
+            buffer = [line]
+            continue
+        if buffer is not None:
+            buffer.append(line)
+    flush()
+    return products
+
+
 # ---------------------------------------------------------------------------
 # 提示词
 # ---------------------------------------------------------------------------
@@ -1591,9 +1769,9 @@ def _assert_all_sections(report: str) -> None:
 
 _PAGE_CSS = """
 :root {
-  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
-  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
-  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  --fg:#1f2328; --muted:#656d76; --line:#e7d9cf; --link:#bc4c00;
+  --bg:#fff; --code:#faf1ea; --accent:#bc4c00;
+  --tint:#fdf6f0; --accent-soft:#fdf3ec; --line-2:#f0e2d8;
   color-scheme: light;
 }
 /* 没有显式选择时跟随系统。`:root:not([data-theme])` 与下面的 `:root[data-theme=…]`
@@ -1601,22 +1779,22 @@ _PAGE_CSS = """
    否则点了按钮不生效。 */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
-    --bg:#0d1117; --code:#161b22; --accent:#f0883e;
-    --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+    --fg:#e6edf3; --muted:#8b949e; --line:#3a2a1e; --link:#f0883e;
+    --bg:#16100c; --code:#1c130d; --accent:#f0883e;
+    --tint:#221812; --accent-soft:#25150a; --line-2:#3a2a1e;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
-  --bg:#0d1117; --code:#161b22; --accent:#f0883e;
-  --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+  --fg:#e6edf3; --muted:#8b949e; --line:#3a2a1e; --link:#f0883e;
+  --bg:#16100c; --code:#1c130d; --accent:#f0883e;
+  --tint:#221812; --accent-soft:#25150a; --line-2:#3a2a1e;
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
-  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
-  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  --fg:#1f2328; --muted:#656d76; --line:#e7d9cf; --link:#bc4c00;
+  --bg:#fff; --code:#faf1ea; --accent:#bc4c00;
+  --tint:#fdf6f0; --accent-soft:#fdf3ec; --line-2:#f0e2d8;
   color-scheme: light;
 }
 * { box-sizing: border-box; }
@@ -1664,6 +1842,55 @@ footer {
 .archive .d { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .archive .sub { color: var(--muted); font-size: 13px; }
 .archive .none { color: var(--muted); }
+.archive .subwrap { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.pchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pchip {
+  font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--tint); color: var(--fg);
+}
+.pchip .pchip-m { color: var(--muted); }
+.pchip:hover { text-decoration: none; border-color: var(--accent); }
+.index-layout { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 72px; align-items: start; }
+.archive-col { min-width: 0; max-width: 520px; }
+.timeline { min-width: 0; color: var(--muted); }
+.timeline h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 2px 0 10px; letter-spacing: .04em; }
+.cal-switch { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cal-title { font-size: 12.5px; font-weight: 600; color: var(--fg); }
+.cal-nav {
+  font: inherit; font-size: 14px; line-height: 1; width: 26px; height: 26px;
+  border: 1px solid var(--line-2); border-radius: 7px; background: transparent;
+  color: var(--muted); cursor: pointer;
+}
+.cal-nav:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.cal-nav:disabled { opacity: .35; cursor: default; }
+.cal-month { display: none; border: 1px solid var(--line-2); border-radius: 10px; background: transparent; padding: 10px 10px 7px; }
+.cal-month.active { display: block; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-week span { text-align: center; font-size: 9.5px; color: var(--muted); }
+.cal-day { position: relative; min-height: 32px; border-radius: 6px; padding: 3px 2px; }
+.cal-day.empty { visibility: hidden; }
+.cal-day.has { background: var(--code); }
+.cal-num { display: block; text-align: center; font-size: 10px; color: var(--muted); }
+.dots { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
+.dot-item { position: relative; display: inline-flex; }
+.dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.dot.fallback { background: transparent; border: 1.5px solid var(--muted); }
+.dot.more { width: auto; height: auto; background: none !important; color: var(--muted); font-size: 8.5px; }
+.dot-card {
+  display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  width: 250px; z-index: 30; background: var(--bg); border: 1px solid var(--line-2);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(60,30,10,.14); padding: 10px 12px;
+  flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.5;
+}
+.dot-item:hover .dot-card { display: flex; }
+.dc-head { display: flex; align-items: center; gap: 6px; }
+.dc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.dc-brand { font-weight: 600; }
+.dc-model { color: var(--muted); }
+.dc-title { font-weight: 600; }
+.dc-point { color: var(--fg); }
+.dc-feat { color: var(--muted); border-left: 2px solid var(--accent); padding-left: 8px; }
+.dc-date { color: var(--muted); font-size: 11px; }
 
 /* ---------------- 图文版 / 文字版 切换（纯 CSS，不用 JS） ----------------
    兄弟选择器 `~` 要求 radio 必须排在 .view / .vswitch **前面**，且同为 .wrap 的子元素。
@@ -1857,6 +2084,9 @@ section[id] { scroll-margin-top: 16px; }
   color: var(--muted); font-size: 12.5px;
 }
 
+@media (max-width: 760px) {
+  .index-layout { grid-template-columns: 1fr; }
+}
 @media (max-width: 520px) {
   .wrap { padding: 16px 15px 56px; }
   .archive li { flex-direction: column; gap: 2px; }
@@ -2045,6 +2275,7 @@ def markdown_to_html(md: str, id_prefix: str = "sec-") -> str:
     list_kind: str | None = None         # "ul" / "ol"
     in_fence = False
     h2_seen = 0
+    h3_seen = 0
 
     def flush_para() -> None:
         nonlocal para
@@ -2099,10 +2330,12 @@ def markdown_to_html(md: str, id_prefix: str = "sec-") -> str:
 
         if stripped.startswith("### "):
             flush_all()
-            out.append(f"<h3>{_inline(stripped[4:])}</h3>")
+            h3_seen += 1
+            out.append(f'<h3 id="{id_prefix}item-{h2_seen}-{h3_seen}">{_inline(stripped[4:])}</h3>')
         elif stripped.startswith("## "):
             flush_all()
             h2_seen += 1
+            h3_seen = 0
             out.append(f'<h2 id="{id_prefix}{h2_seen}">{_inline(stripped[3:])}</h2>')
         elif stripped.startswith("# "):
             flush_all()
@@ -2308,7 +2541,7 @@ def _plain_words(text: str) -> str:
     return "<br>\n".join(_inline(l) for l in text.split("\n") if l.strip())
 
 
-def _rich_group(lines: list[str]) -> str:
+def _rich_group(lines: list[str], entry_id: str = "") -> str:
     """渲染一个「组」：条目（`### `）或地区分组（`**北美**`）。"""
     head = lines[0].strip()
     bullets: list[str] = []
@@ -2350,7 +2583,8 @@ def _rich_group(lines: list[str]) -> str:
             # 模型偶尔不按 `**厂商** —— 标题` 写。整条照原样渲染，不要丢内容。
             inner = _inline(text)
         badge = f'<span class="idx">{index}</span>' if index else ""
-        head_html = f'<h3 class="entry-head">{badge}{inner}</h3>'
+        id_attr = f' id="{entry_id}"' if entry_id else ""
+        head_html = f'<h3 class="entry-head"{id_attr}>{badge}{inner}</h3>'
     else:
         # 地区分组行。`**北美**` 这种整行加粗已被 `_split_groups` 认成组头。
         matched = _DIGEST_REGION_RE.match(head)
@@ -2519,9 +2753,12 @@ def render_rich(md: str, date_str: str) -> str:
         toc_side = toc_inline = ""
 
     cards: list[str] = []
-    for item in parsed:
+    for sec_index, item in enumerate(parsed, start=1):
         if item["groups"]:
-            inner = [_rich_group(g) for g in item["groups"]]
+            inner = []
+            for gi, g in enumerate(item["groups"], start=1):
+                eid = f"item-{sec_index}-{gi}" if item["kind"] == "entry" else ""
+                inner.append(_rich_group(g, entry_id=eid))
             # ⚠️ `pre` 只在这条分支里渲染。**没有分组时 `pre` 就是整个正文**
             # （`_split_groups` 的语义是"第一个分组之前的行"，没有分组就没有"之前"），
             # 而下面那个分支已经用 `_rich_advice` 把整段渲染过一遍了 —— 再渲染一次
@@ -2577,17 +2814,145 @@ def render_issue_page(
     )
 
 
+def _issue_product_chips(item: dict) -> str:
+    """每期条目旁的新品标签（只含板块一条目），点击直达该期对应条目。"""
+    if not item["products"]:
+        return ""
+    chips = "".join(
+        f'<a class="pchip" href="{item["date"]}.html#{p["anchor"]}" '
+        f'title="{html.escape(p["title"])}">'
+        f'{html.escape(p["vendor"])}'
+        f'<span class="pchip-m"> · {html.escape(p["phrase"])}</span></a>'
+        for p in item["products"]
+    )
+    return f'<div class="pchips">{chips}</div>'
+
+
+_CAL_WEEKDAYS = ("一", "二", "三", "四", "五", "六", "日")
+
+
+def _days_in_month(year: int, month: int) -> int:
+    if month == 12:
+        nxt = date(year + 1, 1, 1)
+    else:
+        nxt = date(year, month + 1, 1)
+    return (nxt - timedelta(days=1)).day
+
+
+def _dot_markup(report_date: str, p: dict) -> str:
+    """日历圆点 + 悬停卡片。圆点按品牌着色；回退日期用空心描边。"""
+    fallback = p["date_kind"] == "fallback"
+    dot_cls = "dot fallback" if fallback else "dot"
+    dot_style = (
+        f' style="border-color:{p["color"]}"'
+        if fallback else f' style="background:{p["color"]}"'
+    )
+    date_line = f'{p["date"]} · 周报收录 {report_date}' if fallback else p["date"]
+    card_parts = [
+        '<span class="dc-head">'
+        f'<span class="dc-dot" style="background:{p["color"]}"></span>'
+        f'<span class="dc-brand">{html.escape(p["vendor"])}</span>'
+        f'<span class="dc-model">{html.escape(p["phrase"])}</span></span>',
+        f'<span class="dc-title">{html.escape(p["title"])}</span>',
+    ]
+    if p["point"]:
+        card_parts.append(f'<span class="dc-point">{html.escape(p["point"])}</span>')
+    if p["feature"]:
+        card_parts.append(f'<span class="dc-feat">{html.escape(p["feature"])}</span>')
+    card_parts.append(f'<span class="dc-date">{html.escape(date_line)}</span>')
+    return (
+        f'<span class="dot-item"><a class="{dot_cls}"{dot_style} '
+        f'href="{report_date}.html#{p["anchor"]}"></a>'
+        f'<span class="dot-card">{"".join(card_parts)}</span></span>'
+    )
+
+
+def _calendar_block(issues: list[dict]) -> str:
+    """右侧栏新品日历：按实际发布日期归月，月份可切换；圆点悬停出摘要卡片。"""
+    by_date: dict[str, list[tuple[str, dict]]] = {}
+    for item in issues:
+        for p in item["products"]:
+            by_date.setdefault(p["date"], []).append((item["date"], p))
+    months = sorted({d[:7] for d in by_date})
+    if not months:
+        return ""
+    blocks: list[str] = []
+    for idx, month_key in enumerate(months):
+        year_s, month_s = month_key.split("-")
+        year, month_num = int(year_s), int(month_s)
+        offset = date(year, month_num, 1).weekday()  # 周一为 0
+        day_cells: list[str] = [
+            '<span class="cal-day empty"></span>' for _ in range(offset)
+        ]
+        for day in range(1, _days_in_month(year, month_num) + 1):
+            ds = f"{month_key}-{day:02d}"
+            day_items = by_date.get(ds)
+            if not day_items:
+                day_cells.append(
+                    f'<span class="cal-day"><span class="cal-num">{day}</span></span>'
+                )
+                continue
+            dots = "".join(_dot_markup(report, p) for report, p in day_items[:8])
+            more = (
+                f'<span class="dot more">+{len(day_items) - 8}</span>'
+                if len(day_items) > 8 else ""
+            )
+            day_cells.append(
+                f'<div class="cal-day has"><span class="cal-num">{day}</span>'
+                f'<span class="dots">{dots}{more}</span></div>'
+            )
+        week_head = (
+            '<div class="cal-grid cal-week">'
+            + "".join(f"<span>{w}</span>" for w in _CAL_WEEKDAYS)
+            + "</div>"
+        )
+        active = " active" if idx == len(months) - 1 else ""
+        blocks.append(
+            f'<div class="cal-month{active}" data-month="{month_key}" '
+            f'data-label="{year_s}年{month_num}月">{week_head}'
+            f'<div class="cal-grid">{"".join(day_cells)}</div></div>'
+        )
+    last_y, last_m = months[-1].split("-")
+    init_label = f"{last_y}年{int(last_m)}月"
+    switcher = (
+        '<div class="cal-switch">'
+        '<button type="button" class="cal-nav" data-dir="-1" aria-label="上一月">‹</button>'
+        f'<span class="cal-title">{init_label}</span>'
+        '<button type="button" class="cal-nav" data-dir="1" aria-label="下一月">›</button>'
+        "</div>"
+    )
+    script = (
+        '<script>(function(){var b=document.querySelector(".cal-body");'
+        'if(!b)return;var m=Array.prototype.slice.call(b.querySelectorAll(".cal-month"));'
+        'var t=document.querySelector(".cal-title");var n=Array.prototype.slice.call(document.querySelectorAll(".cal-nav"));'
+        'var i=m.length-1;function show(k){i=Math.max(0,Math.min(m.length-1,k));'
+        'm.forEach(function(x,j){x.classList.toggle("active",j===i);});'
+        'if(t)t.textContent=m[i].getAttribute("data-label");'
+        'n.forEach(function(x){var d=parseInt(x.getAttribute("data-dir"),10);'
+        'x.disabled=(d<0&&i===0)||(d>0&&i===m.length-1);});}'
+        'n.forEach(function(x){x.addEventListener("click",function(){show(i+parseInt(x.getAttribute("data-dir"),10));});});'
+        'show(i);})();</script>'
+    )
+    return (
+        '<aside class="timeline"><h2>新品日历</h2>' + switcher
+        + '<div class="cal-body">' + "".join(blocks) + "</div>" + script + "</aside>"
+    )
+
+
 def render_index_page(issues: list[dict], index_name: str) -> str:
     if issues:
         rows = "\n".join(
             f'<li><a class="d" href="{item["date"]}.html">{item["date"]}</a>'
-            f'<span class="sub">{html.escape(item["title"])}'
-            f' ｜ {item["count"]} 条</span></li>'
+            f'<div class="subwrap"><span class="sub">{html.escape(item["title"])}'
+            f' ｜ {item["count"]} 条</span>{_issue_product_chips(item)}</div></li>'
             for item in issues
         )
         body = (
-            f'<p class="sub">共 {len(issues)} 期 ｜ 最新一期 '
-            f'{issues[0]["date"]}</p>\n<ul class="archive">\n{rows}\n</ul>'
+            '<div class="index-layout">\n'
+            f'<div class="archive-col"><p class="sub">共 {len(issues)} 期 ｜ 最新一期 '
+            f'{issues[0]["date"]}</p>\n<ul class="archive">\n{rows}\n</ul></div>\n'
+            + _calendar_block(issues)
+            + "\n</div>"
         )
     else:
         body = '<p class="none">还没有往期报告。</p>'
@@ -2619,6 +2984,7 @@ def collect_issues(docs_dir: Path) -> list[dict]:
             "date": matched.group(1),
             "title": _report_title(md),
             "count": len(extract_entries(md)),
+            "products": collect_products(md, matched.group(1)),
             "md": md,
         })
     issues.sort(key=lambda item: item["date"], reverse=True)

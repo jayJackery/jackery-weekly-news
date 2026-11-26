@@ -39,9 +39,9 @@
 
 <style>
 :root {
-  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
-  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
-  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  --fg:#1f2328; --muted:#656d76; --line:#e7d9cf; --link:#bc4c00;
+  --bg:#fff; --code:#faf1ea; --accent:#bc4c00;
+  --tint:#fdf6f0; --accent-soft:#fdf3ec; --line-2:#f0e2d8;
   color-scheme: light;
 }
 /* 没有显式选择时跟随系统。`:root:not([data-theme])` 与下面的 `:root[data-theme=…]`
@@ -49,22 +49,22 @@
    否则点了按钮不生效。 */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
-    --bg:#0d1117; --code:#161b22; --accent:#f0883e;
-    --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+    --fg:#e6edf3; --muted:#8b949e; --line:#3a2a1e; --link:#f0883e;
+    --bg:#16100c; --code:#1c130d; --accent:#f0883e;
+    --tint:#221812; --accent-soft:#25150a; --line-2:#3a2a1e;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
-  --bg:#0d1117; --code:#161b22; --accent:#f0883e;
-  --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+  --fg:#e6edf3; --muted:#8b949e; --line:#3a2a1e; --link:#f0883e;
+  --bg:#16100c; --code:#1c130d; --accent:#f0883e;
+  --tint:#221812; --accent-soft:#25150a; --line-2:#3a2a1e;
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
-  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
-  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  --fg:#1f2328; --muted:#656d76; --line:#e7d9cf; --link:#bc4c00;
+  --bg:#fff; --code:#faf1ea; --accent:#bc4c00;
+  --tint:#fdf6f0; --accent-soft:#fdf3ec; --line-2:#f0e2d8;
   color-scheme: light;
 }
 * { box-sizing: border-box; }
@@ -112,6 +112,55 @@ footer {
 .archive .d { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .archive .sub { color: var(--muted); font-size: 13px; }
 .archive .none { color: var(--muted); }
+.archive .subwrap { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.pchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pchip {
+  font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--tint); color: var(--fg);
+}
+.pchip .pchip-m { color: var(--muted); }
+.pchip:hover { text-decoration: none; border-color: var(--accent); }
+.index-layout { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 72px; align-items: start; }
+.archive-col { min-width: 0; max-width: 520px; }
+.timeline { min-width: 0; color: var(--muted); }
+.timeline h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 2px 0 10px; letter-spacing: .04em; }
+.cal-switch { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cal-title { font-size: 12.5px; font-weight: 600; color: var(--fg); }
+.cal-nav {
+  font: inherit; font-size: 14px; line-height: 1; width: 26px; height: 26px;
+  border: 1px solid var(--line-2); border-radius: 7px; background: transparent;
+  color: var(--muted); cursor: pointer;
+}
+.cal-nav:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.cal-nav:disabled { opacity: .35; cursor: default; }
+.cal-month { display: none; border: 1px solid var(--line-2); border-radius: 10px; background: transparent; padding: 10px 10px 7px; }
+.cal-month.active { display: block; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-week span { text-align: center; font-size: 9.5px; color: var(--muted); }
+.cal-day { position: relative; min-height: 32px; border-radius: 6px; padding: 3px 2px; }
+.cal-day.empty { visibility: hidden; }
+.cal-day.has { background: var(--code); }
+.cal-num { display: block; text-align: center; font-size: 10px; color: var(--muted); }
+.dots { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
+.dot-item { position: relative; display: inline-flex; }
+.dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.dot.fallback { background: transparent; border: 1.5px solid var(--muted); }
+.dot.more { width: auto; height: auto; background: none !important; color: var(--muted); font-size: 8.5px; }
+.dot-card {
+  display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  width: 250px; z-index: 30; background: var(--bg); border: 1px solid var(--line-2);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(60,30,10,.14); padding: 10px 12px;
+  flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.5;
+}
+.dot-item:hover .dot-card { display: flex; }
+.dc-head { display: flex; align-items: center; gap: 6px; }
+.dc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.dc-brand { font-weight: 600; }
+.dc-model { color: var(--muted); }
+.dc-title { font-weight: 600; }
+.dc-point { color: var(--fg); }
+.dc-feat { color: var(--muted); border-left: 2px solid var(--accent); padding-left: 8px; }
+.dc-date { color: var(--muted); font-size: 11px; }
 
 /* ---------------- 图文版 / 文字版 切换（纯 CSS，不用 JS） ----------------
    兄弟选择器 `~` 要求 radio 必须排在 .view / .vswitch **前面**，且同为 .wrap 的子元素。
@@ -305,6 +354,9 @@ section[id] { scroll-margin-top: 16px; }
   color: var(--muted); font-size: 12.5px;
 }
 
+@media (max-width: 760px) {
+  .index-layout { grid-template-columns: 1fr; }
+}
 @media (max-width: 520px) {
   .wrap { padding: 16px 15px 56px; }
   .archive li { flex-direction: column; gap: 2px; }
@@ -322,7 +374,7 @@ section[id] { scroll-margin-top: 16px; }
 <div class="wrap has-toggle">
 <nav class="top"><a href="2026-10-19.html">← 上一期</a><a href="index.html">全部往期</a><a href="2026-11-02.html">下一期 →</a></nav>
 <input type="radio" name="view" id="v-rich" class="vmode" checked><input type="radio" name="view" id="v-plain" class="vmode"><div class="ctrls"><span class="vswitch"><label for="v-rich">图文版</label><label for="v-plain">文字版</label></span><button type="button" class="themebtn" id="themebtn" hidden>深色</button></div><div class="view view-rich"><main><header class="hero"><div class="kicker">储能结构周报</div><h1>2026-10-26</h1><div class="meta"><span class="chip">本期 8 条</span><span class="chip">覆盖周期：2026-10-12 ~ 2026-10-26</span><span class="chip">面向储能结构工程师</span></div></header><aside class="toc toc-side" aria-label="本期目录"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">3 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">3 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">2 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></aside><div class="toc toc-inline"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">3 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">3 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">2 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></div><section class="card" id="sec-1"><div class="sec-head"><span class="sec-num">一</span><span class="sec-title">便携&amp;阳台储能竞品动态</span><span class="sec-count">3 条</span></div><article class="entry">
-<h3 class="entry-head"><span class="idx">2</span><span class="vendor">EcoFlow</span><span class="dash"> —— </span><span class="etitle">DELTA Gen4 在 3kWh 级引入明显的体积与重量压缩</span></h3>
+<h3 class="entry-head" id="item-1-1"><span class="idx">2</span><span class="vendor">EcoFlow</span><span class="dash"> —— </span><span class="etitle">DELTA Gen4 在 3kWh 级引入明显的体积与重量压缩</span></h3>
 <ul class="pts">
 <li><strong>新品</strong>：EcoFlow 于 10 月 21 日发布 <strong>DELTA 3000 Gen4</strong> 与 <strong>DELTA 3800 Gen4</strong>，日本市场 10 月 23 日开启预订，10 月 30 日正式发售。</li>
 <li><strong>规格</strong>：<strong>DELTA 3000 Gen4</strong> 容量 3,072Wh，尺寸约 477×289×282mm，体积约 38.9L，重量约 26kg；<strong>DELTA 3800 Gen4</strong> 容量 3,763Wh，尺寸约 477×289×307mm，体积约 42.3L，重量约 30.6kg。</li>
@@ -334,7 +386,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://kaden.watch.impress.co.jp/docs/news/2150125.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-76f20899736c" data-goatcounter-title="家电 Watch">家电 Watch</a> ｜ <a href="https://jp.ecoflow.com/products/delta-3000-gen4-portable-power-station" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-a7de89f9759b" data-goatcounter-title="EcoFlow Japan">EcoFlow Japan</a> ｜ <a href="https://www.itmedia.co.jp/pcuser/articles/2610/23/news056.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-da65b4a2fea7" data-goatcounter-title="ITmedia">ITmedia</a></p>
 <p class="feat"><span class="lbl">特点</span> EcoFlow 通过内部件与筐体重构压缩 3kWh 级产品的占地和搬运重量，结构重点已经从单纯扩容转向高容量机身的小型化。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">3</span><span class="vendor">DJI Power</span><span class="dash"> —— </span><span class="etitle">Power Auro 2000 Elite 将充电模块内置到 2kWh 级机身</span></h3>
+<h3 class="entry-head" id="item-1-2"><span class="idx">3</span><span class="vendor">DJI Power</span><span class="dash"> —— </span><span class="etitle">Power Auro 2000 Elite 将充电模块内置到 2kWh 级机身</span></h3>
 <ul class="pts">
 <li><strong>新品</strong>：<strong>DJI Power Auro 2000 Elite</strong> 计划于 10 月 28 日上市，定位为约 2kWh、2kW 输出的便携电源。</li>
 <li><strong>规格</strong>：电池容量 2,016Wh，持续输出功率 2,000W；相较上一代 <strong>DJI Power 2000</strong>，体积减少约 24%、重量减轻约 14%。</li>
@@ -346,7 +398,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.teltarif.de/dji-powerstation-vorbestelleraktion/news/107000.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-3d3bc0dd70b1" data-goatcounter-title="teltarif">teltarif</a> ｜ <a href="https://post.smzdm.com/p/am933xev/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-0661613eeb79" data-goatcounter-title="什么值得买">什么值得买</a></p>
 <p class="feat"><span class="lbl">特点</span> DJI Power Auro 2000 Elite 的结构取舍是牺牲部分外置模块的可替换性，换取更高的系统集成度和更少的随行附件。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">4</span><span class="vendor">Anker SOLIX</span><span class="dash"> —— </span><span class="etitle">S5000 用带轮 5kWh 机身切入家庭备电</span></h3>
+<h3 class="entry-head" id="item-1-3"><span class="idx">4</span><span class="vendor">Anker SOLIX</span><span class="dash"> —— </span><span class="etitle">S5000 用带轮 5kWh 机身切入家庭备电</span></h3>
 <ul class="pts">
 <li><strong>新品</strong>：<strong>Anker SOLIX S5000</strong> 为 5kWh 级便携家庭备电产品，采用 LFP 电池和带轮机身，面向家庭备用电源及大功率负载。</li>
 <li><strong>规格</strong>：容量 5,024Wh，额定输出功率 4,500W，峰值输出 8,000W；机身重量约 44kg，体积约 58L。</li>
@@ -359,7 +411,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.ess-news.com/2026/10/09/anker-solix-announces-s5000-power-station-with-4-5-kw-output/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-ed6812ffcdbe" data-goatcounter-title="Energy Storage">Energy Storage</a> ｜ <a href="https://www.desmoinesregister.com/press-release/story/137375/anker-introduces-the-anker-solix-s5000-the-longest-lasting-5kwh-portable-power-station/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-9256e0d9be0a" data-goatcounter-title="Des Moines Register">Des Moines Register</a></p>
 <p class="feat"><span class="lbl">特点</span> S5000 已经不是传统意义上的手提电源，其结构设计重点转为 5kWh 级机柜的滚动搬运、双电压输出和家庭扩展。</p>
 </article></section><section class="card" id="sec-2"><div class="sec-head"><span class="sec-num">二</span><span class="sec-title">户用&amp;工商业储能与大机动态</span><span class="sec-count">3 条</span></div><article class="entry">
-<h3 class="entry-head"><span class="idx">1</span><span class="vendor">Hoymiles</span><span class="dash"> —— </span><span class="etitle">HoyUltra 2,000M 将 2MWh 级工商业储能做成集成式液冷集装箱</span></h3>
+<h3 class="entry-head" id="item-2-1"><span class="idx">1</span><span class="vendor">Hoymiles</span><span class="dash"> —— </span><span class="etitle">HoyUltra 2,000M 将 2MWh 级工商业储能做成集成式液冷集装箱</span></h3>
 <ul class="pts">
 <li><strong>规格</strong>：HoyUltra 2,000M 提供 15 种配置，容量覆盖 2MWh 至 2.61MWh，额定交流输出功率覆盖 500kW 至 1.25MW。</li>
 <li><strong>接口与架构</strong>：支持 380/400V、690V 和 800V 交流电压等级，系统集成电池、PCS、热管理、静态转换开关（STS）及消防设备。</li>
@@ -372,7 +424,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.pv-magazine-australia.com/2026/10/26/hoymiles-releases-2000-kwh-ci-energy-storage-solution/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-b07a31f37b7d" data-goatcounter-title="pv magazine Australia">pv magazine Australia</a></p>
 <p class="feat"><span class="lbl">特点</span> HoyUltra 2,000M 的结构路线是把电池、PCS、液冷、STS 和消防前置集成到同一集装箱，设计重点从单柜能量密度扩展到高压等级兼容与快速备电切换。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">2</span><span class="vendor">Sineng Electric</span><span class="dash"> —— </span><span class="etitle">430kW 液冷构网型组串 PCS 降低热管理辅助功耗</span></h3>
+<h3 class="entry-head" id="item-2-2"><span class="idx">2</span><span class="vendor">Sineng Electric</span><span class="dash"> —— </span><span class="etitle">430kW 液冷构网型组串 PCS 降低热管理辅助功耗</span></h3>
 <ul class="pts">
 <li><strong>规格</strong>：Sineng Electric 在 REI 2026 展示 1.25/1.725MW 集中式 PCS 和 430kW 液冷组串式 PCS。</li>
 <li><strong>接口与架构</strong>：430kW 组串式 PCS 支持构网型运行，并结合簇级能量管理。</li>
@@ -384,7 +436,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.energy-storage.news/industry-updates/sineng-electric-showcases-grid-forming-technology-and-solar-storage-hydrogen-solutions-at-rei/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-f0b023f6527b" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a></p>
 <p class="feat"><span class="lbl">特点</span> 该方案把液冷收益直接落到 PCS 功率器件温升和辅耗，结构设计需要同步处理冷却回路可维护性与构网控制硬件的电磁兼容。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">3</span><span class="vendor">Sungrow</span><span class="dash"> —— </span><span class="etitle">PowerTitan 3.0 通过 UL 9540A:2026 大规模火灾测试</span></h3>
+<h3 class="entry-head" id="item-2-3"><span class="idx">3</span><span class="vendor">Sungrow</span><span class="dash"> —— </span><span class="etitle">PowerTitan 3.0 通过 UL 9540A:2026 大规模火灾测试</span></h3>
 <ul class="pts">
 <li><strong>认证与测试</strong>：PowerTitan 3.0 完成依据 UL 9540A:2026 及 CSA/ANSI C800-2025 开展的大规模火灾测试。</li>
 <li><strong>结构表现</strong>：测试评估热失控从起始储能集装箱向相邻集装箱及中压变电站传播的情况。</li>
@@ -396,7 +448,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.energy-storage.news/industry-updates/sungrow-powertitan-3-0-validates-system-level-safety-under-extreme-large-scale-fire-test/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-f7cf476134ed" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a></p>
 <p class="feat"><span class="lbl">特点</span> PowerTitan 3.0 的公开验证重点不是单一柜体耐火，而是热失控后的跨柜隔离，因此柜体泄压、消防接口和现场间距必须作为联合设计变量。</p>
 </article></section><section class="card" id="sec-3"><div class="sec-head"><span class="sec-num">三</span><span class="sec-title">电池与材料技术突破</span><span class="sec-count">2 条</span></div><article class="entry">
-<h3 class="entry-head"><span class="idx">1</span><span class="vendor">Dow</span><span class="dash"> —— </span><span class="etitle">VOLTRICELL 将电芯材料、热防护泡沫和壳体陶瓷化涂层放进同一平台</span></h3>
+<h3 class="entry-head" id="item-3-1"><span class="idx">1</span><span class="vendor">Dow</span><span class="dash"> —— </span><span class="etitle">VOLTRICELL 将电芯材料、热防护泡沫和壳体陶瓷化涂层放进同一平台</span></h3>
 <ul class="pts">
 <li><strong>电芯与材料</strong>：VOLTRICELL 覆盖粘结剂、分散剂、流变改性剂、表面活性剂及特种添加剂，面向电极、隔膜、涂层和电芯封装工艺。</li>
 <li><strong>适用体系</strong>：材料平台面向现有电池，并兼容钠离子、硅负极和固态电池技术路线。</li>
@@ -408,7 +460,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://chargedevs.com/newswire/dow-launches-voltricell-platform-of-binders-dispersants-and-additives-for-battery-cells/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-02a03b61946e" data-goatcounter-title="Charged EVs">Charged EVs</a> ｜ <a href="https://finance.eastmoney.com/a/202610123892883182.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-d3c15b3320ab" data-goatcounter-title="东方财富">东方财富</a></p>
 <p class="feat"><span class="lbl">特点</span> Dow 的路线不是单独提高某一项材料指标，而是把电芯制造材料、狭窄空间隔热和壳体热事件防护连成一套，结构工程仍需等待明确牌号和工艺参数后才能进行尺寸与可靠性定型。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">2</span><span class="vendor">研究团队</span><span class="dash"> —— </span><span class="etitle">钠基固态结构电池把储能单元兼作 CFRP 加固件</span></h3>
+<h3 class="entry-head" id="item-3-2"><span class="idx">2</span><span class="vendor">研究团队</span><span class="dash"> —— </span><span class="etitle">钠基固态结构电池把储能单元兼作 CFRP 加固件</span></h3>
 <ul class="pts">
 <li><strong>电芯与体系</strong>：研究提出钠离子固态结构电池，将钠基玻璃电解质嵌入碳纤维增强聚合物（CFRP）壳体。</li>
 <li><strong>结构变化</strong>：CFRP 壳体同时承担强度和刚度功能，电池不再是独立 Pack 后嵌入承力结构，而是把储能和结构补强合并。</li>
@@ -464,38 +516,38 @@ section[id] { scroll-margin-top: 16px; }
 <p class="signoff">—— 本消息由自动化脚本生成，检索源：Perplexity sonar-pro-search</p></section></main></div><div class="view view-plain"><main><h1>[行业资讯] 储能结构周报（2026-10-26）</h1>
 <blockquote>覆盖周期：2026-10-12 ~ 2026-10-26 ｜ 面向储能结构工程师</blockquote>
 <h2 id="p-1">一、便携&amp;阳台储能竞品动态</h2>
-<h3>2. <strong>EcoFlow</strong> —— DELTA Gen4 在 3kWh 级引入明显的体积与重量压缩</h3>
+<h3 id="p-item-1-1">2. <strong>EcoFlow</strong> —— DELTA Gen4 在 3kWh 级引入明显的体积与重量压缩</h3>
 <ul><li><strong>新品</strong>：EcoFlow 于 10 月 21 日发布 <strong>DELTA 3000 Gen4</strong> 与 <strong>DELTA 3800 Gen4</strong>，日本市场 10 月 23 日开启预订，10 月 30 日正式发售。</li><li><strong>规格</strong>：<strong>DELTA 3000 Gen4</strong> 容量 3,072Wh，尺寸约 477×289×282mm，体积约 38.9L，重量约 26kg；<strong>DELTA 3800 Gen4</strong> 容量 3,763Wh，尺寸约 477×289×307mm，体积约 42.3L，重量约 30.6kg。</li><li><strong>结构变化</strong>：相较 <strong>DELTA 3 Ultra</strong>，DELTA 3000 Gen4 体积减少约 52%、重量减少约 19%；相较 <strong>DELTA Pro</strong>，DELTA 3800 Gen4 体积减少约 44%、重量减少约 32%。厂商将变化归因于内部结构、筐体和散热设计优化。</li><li><strong>接口与架构</strong>：DELTA 3000 Gen4 支持最高 1,000W 光伏输入；DELTA 3800 Gen4 支持最高 2,000W 光伏输入，并可通过额外电池扩展至 11,955Wh。两款产品均将主要输出端口集中在正面，配置 140W USB-C、65W USB-C、USB-A、NEMA L6-30 和 AC 输出接口。</li><li><strong>价格</strong>：日本官方定价分别为 308,000 日元和 360,800 日元，未见人民币国内售价披露。</li><li><strong>缺口</strong>：未公开 IP 防护等级、循环寿命、能量密度、压实密度及具体防水密封结构。</li></ul>
 <p><strong>来源</strong>：<a href="https://kaden.watch.impress.co.jp/docs/news/2150125.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-76f20899736c" data-goatcounter-title="家电 Watch">家电 Watch</a> ｜ <a href="https://jp.ecoflow.com/products/delta-3000-gen4-portable-power-station" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-a7de89f9759b" data-goatcounter-title="EcoFlow Japan">EcoFlow Japan</a> ｜ <a href="https://www.itmedia.co.jp/pcuser/articles/2610/23/news056.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-da65b4a2fea7" data-goatcounter-title="ITmedia">ITmedia</a></p>
 <p><strong>特点</strong>：EcoFlow 通过内部件与筐体重构压缩 3kWh 级产品的占地和搬运重量，结构重点已经从单纯扩容转向高容量机身的小型化。</p>
-<h3>3. <strong>DJI Power</strong> —— Power Auro 2000 Elite 将充电模块内置到 2kWh 级机身</h3>
+<h3 id="p-item-1-2">3. <strong>DJI Power</strong> —— Power Auro 2000 Elite 将充电模块内置到 2kWh 级机身</h3>
 <ul><li><strong>新品</strong>：<strong>DJI Power Auro 2000 Elite</strong> 计划于 10 月 28 日上市，定位为约 2kWh、2kW 输出的便携电源。</li><li><strong>规格</strong>：电池容量 2,016Wh，持续输出功率 2,000W；相较上一代 <strong>DJI Power 2000</strong>，体积减少约 24%、重量减轻约 14%。</li><li><strong>结构变化</strong>：产品将太阳能充电和车辆充电模块直接集成在主机内，减少外置充电模块和转接附件；厂商未公开机身尺寸、重量绝对值及内部电芯排布。</li><li><strong>接口与架构</strong>：集成最高 600W MPPT 太阳能输入和 600W 车辆充电模块；两个 SDC 接口可组合太阳能与车辆充电。</li><li><strong>价格</strong>：截至报道发布时，产品本体官方价格尚未公布。</li><li><strong>缺口</strong>：未公开 IP 防护等级、循环寿命、能量密度、压实密度、机身尺寸和准确重量。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.teltarif.de/dji-powerstation-vorbestelleraktion/news/107000.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-3d3bc0dd70b1" data-goatcounter-title="teltarif">teltarif</a> ｜ <a href="https://post.smzdm.com/p/am933xev/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-0661613eeb79" data-goatcounter-title="什么值得买">什么值得买</a></p>
 <p><strong>特点</strong>：DJI Power Auro 2000 Elite 的结构取舍是牺牲部分外置模块的可替换性，换取更高的系统集成度和更少的随行附件。</p>
-<h3>4. <strong>Anker SOLIX</strong> —— S5000 用带轮 5kWh 机身切入家庭备电</h3>
+<h3 id="p-item-1-3">4. <strong>Anker SOLIX</strong> —— S5000 用带轮 5kWh 机身切入家庭备电</h3>
 <ul><li><strong>新品</strong>：<strong>Anker SOLIX S5000</strong> 为 5kWh 级便携家庭备电产品，采用 LFP 电池和带轮机身，面向家庭备用电源及大功率负载。</li><li><strong>规格</strong>：容量 5,024Wh，额定输出功率 4,500W，峰值输出 8,000W；机身重量约 44kg，体积约 58L。</li><li><strong>结构变化</strong>：厂商披露其相较选定的同级 5kWh 产品体积小约 45%、重量轻约 28%；配置脚轮和伸缩拉杆，搬运方式从手提转向地面滚动。</li><li><strong>接口与架构</strong>：支持 120V/240V 双电压输出，最高 3,000W 光伏输入；电池容量可扩展至 30kWh。</li><li><strong>价格</strong>：美国上市价为 2,499.99 美元，计划于 10 月 27 日发售。</li><li><strong>缺口</strong>：未公开 IP 防护等级、循环寿命、能量密度、压实密度及具体轮组、拉杆和承重结构参数。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.ess-news.com/2026/10/09/anker-solix-announces-s5000-power-station-with-4-5-kw-output/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-ed6812ffcdbe" data-goatcounter-title="Energy Storage">Energy Storage</a> ｜ <a href="https://www.desmoinesregister.com/press-release/story/137375/anker-introduces-the-anker-solix-s5000-the-longest-lasting-5kwh-portable-power-station/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-9256e0d9be0a" data-goatcounter-title="Des Moines Register">Des Moines Register</a></p>
 <p><strong>特点</strong>：S5000 已经不是传统意义上的手提电源，其结构设计重点转为 5kWh 级机柜的滚动搬运、双电压输出和家庭扩展。</p>
 <p>本周期除上述事件外，未检索到 <strong>Goal Zero、Segway、Oupes、Vtoman、Eco-Worthy、PowerOak、Hoymiles</strong> 在 2026 年 10 月 12—26 日期间可由文章详情页核实、且未与上一期重复的新品或结构改型动态。</p>
 <h2 id="p-2">二、户用&amp;工商业储能与大机动态</h2>
-<h3>1. <strong>Hoymiles</strong> —— HoyUltra 2,000M 将 2MWh 级工商业储能做成集成式液冷集装箱</h3>
+<h3 id="p-item-2-1">1. <strong>Hoymiles</strong> —— HoyUltra 2,000M 将 2MWh 级工商业储能做成集成式液冷集装箱</h3>
 <ul><li><strong>规格</strong>：HoyUltra 2,000M 提供 15 种配置，容量覆盖 2MWh 至 2.61MWh，额定交流输出功率覆盖 500kW 至 1.25MW。</li><li><strong>接口与架构</strong>：支持 380/400V、690V 和 800V 交流电压等级，系统集成电池、PCS、热管理、静态转换开关（STS）及消防设备。</li><li><strong>电芯与材料</strong>：采用 314Ah 磷酸铁锂电芯，供应商未公开。</li><li><strong>结构变化</strong>：PCS 与电池共用液冷系统，工作温度范围为 -30℃至 55℃；环境温度最高 50℃时仍保持额定功率。</li><li><strong>防护与寿命</strong>：柜体防护等级为 IP55，耐腐蚀等级为 C5，适用海拔最高 2,000m；集成烟雾与温度探测、灭火、联锁通风和舱段泄爆装置。</li><li><strong>安装要求</strong>：所有配置外形尺寸均为 6,058×2,591×2,438mm，重量为 22,700~26,000kg；STS 可在 20ms 内切换至备用电源。</li><li><strong>缺口</strong>：未公开液冷回路具体拓扑、冷却液类型、机架/电池簇排布、循环寿命和能量密度。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.pv-magazine-australia.com/2026/10/26/hoymiles-releases-2000-kwh-ci-energy-storage-solution/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-b07a31f37b7d" data-goatcounter-title="pv magazine Australia">pv magazine Australia</a></p>
 <p><strong>特点</strong>：HoyUltra 2,000M 的结构路线是把电池、PCS、液冷、STS 和消防前置集成到同一集装箱，设计重点从单柜能量密度扩展到高压等级兼容与快速备电切换。</p>
-<h3>2. <strong>Sineng Electric</strong> —— 430kW 液冷构网型组串 PCS 降低热管理辅助功耗</h3>
+<h3 id="p-item-2-2">2. <strong>Sineng Electric</strong> —— 430kW 液冷构网型组串 PCS 降低热管理辅助功耗</h3>
 <ul><li><strong>规格</strong>：Sineng Electric 在 REI 2026 展示 1.25/1.725MW 集中式 PCS 和 430kW 液冷组串式 PCS。</li><li><strong>接口与架构</strong>：430kW 组串式 PCS 支持构网型运行，并结合簇级能量管理。</li><li><strong>结构变化</strong>：PCS 采用液冷架构，将功率器件散热回路与系统级能量管理结合，而非仅依靠柜内风冷。</li><li><strong>热管理</strong>：厂商披露液冷设计可使辅助功耗降低 30%，满载时 IGBT 温升降低 5K。</li><li><strong>安装要求</strong>：报道未披露机柜尺寸、重量、IP 防护等级、液冷接口位置及维护净空要求。</li><li><strong>缺口</strong>：未公开构网运行的短路电流能力、黑启动参数、液冷换热器规格、循环寿命和适配电池电压范围。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.energy-storage.news/industry-updates/sineng-electric-showcases-grid-forming-technology-and-solar-storage-hydrogen-solutions-at-rei/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-f0b023f6527b" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a></p>
 <p><strong>特点</strong>：该方案把液冷收益直接落到 PCS 功率器件温升和辅耗，结构设计需要同步处理冷却回路可维护性与构网控制硬件的电磁兼容。</p>
-<h3>3. <strong>Sungrow</strong> —— PowerTitan 3.0 通过 UL 9540A:2026 大规模火灾测试</h3>
+<h3 id="p-item-2-3">3. <strong>Sungrow</strong> —— PowerTitan 3.0 通过 UL 9540A:2026 大规模火灾测试</h3>
 <ul><li><strong>认证与测试</strong>：PowerTitan 3.0 完成依据 UL 9540A:2026 及 CSA/ANSI C800-2025 开展的大规模火灾测试。</li><li><strong>结构表现</strong>：测试评估热失控从起始储能集装箱向相邻集装箱及中压变电站传播的情况。</li><li><strong>防护与寿命</strong>：测试结果显示，热失控未从起始集装箱传播至相邻集装箱或中压变电站。</li><li><strong>结构变化</strong>：该产品被报道为首个完成此类测试的堆叠电芯、交流模块化 BESS；测试重点已从单体/模块安全扩展到集装箱间隔离。</li><li><strong>安装要求</strong>：UL 9540A:2026 的大规模测试涉及围护结构、储能单元间距及主动消防系统的作用，结构选型需与安装边界条件联动。</li><li><strong>缺口</strong>：报道未公开测试中的集装箱尺寸、相邻间距、消防系统参数、泄爆结构和测试持续时间。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.energy-storage.news/industry-updates/sungrow-powertitan-3-0-validates-system-level-safety-under-extreme-large-scale-fire-test/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-f7cf476134ed" data-goatcounter-title="Energy-Storage.News">Energy-Storage.News</a></p>
 <p><strong>特点</strong>：PowerTitan 3.0 的公开验证重点不是单一柜体耐火，而是热失控后的跨柜隔离，因此柜体泄压、消防接口和现场间距必须作为联合设计变量。</p>
 <h2 id="p-3">三、电池与材料技术突破</h2>
-<h3>1. <strong>Dow</strong> —— VOLTRICELL 将电芯材料、热防护泡沫和壳体陶瓷化涂层放进同一平台</h3>
+<h3 id="p-item-3-1">1. <strong>Dow</strong> —— VOLTRICELL 将电芯材料、热防护泡沫和壳体陶瓷化涂层放进同一平台</h3>
 <ul><li><strong>电芯与材料</strong>：VOLTRICELL 覆盖粘结剂、分散剂、流变改性剂、表面活性剂及特种添加剂，面向电极、隔膜、涂层和电芯封装工艺。</li><li><strong>适用体系</strong>：材料平台面向现有电池，并兼容钠离子、硅负极和固态电池技术路线。</li><li><strong>结构变化</strong>：VORAFORCE TP1415 Polyol 用于纤维增强复合材料拉挤成型，强调抗冲击、耐腐蚀和阻燃性能，可对应轻量化防护件或承力件。</li><li><strong>热管理</strong>：DOWSIL EF-6559 Silicone Foam 为双组分发泡材料，适用于电池组件中的狭窄、复杂空间，并兼顾热管理与电气绝缘。</li><li><strong>防护与寿命</strong>：DOWSIL FC-2024 为单组分室温硫化涂层，用于电池壳体、箱体和盖板；高温事件中形成陶瓷化保护层。</li><li><strong>缺口</strong>：公开信息未给出 UL94 等级、导热系数、发泡倍率、固化时间、粘接强度、耐候等级及具体工艺窗口。</li></ul>
 <p><strong>来源</strong>：<a href="https://chargedevs.com/newswire/dow-launches-voltricell-platform-of-binders-dispersants-and-additives-for-battery-cells/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-02a03b61946e" data-goatcounter-title="Charged EVs">Charged EVs</a> ｜ <a href="https://finance.eastmoney.com/a/202610123892883182.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-d3c15b3320ab" data-goatcounter-title="东方财富">东方财富</a></p>
 <p><strong>特点</strong>：Dow 的路线不是单独提高某一项材料指标，而是把电芯制造材料、狭窄空间隔热和壳体热事件防护连成一套，结构工程仍需等待明确牌号和工艺参数后才能进行尺寸与可靠性定型。</p>
-<h3>2. <strong>研究团队</strong> —— 钠基固态结构电池把储能单元兼作 CFRP 加固件</h3>
+<h3 id="p-item-3-2">2. <strong>研究团队</strong> —— 钠基固态结构电池把储能单元兼作 CFRP 加固件</h3>
 <ul><li><strong>电芯与体系</strong>：研究提出钠离子固态结构电池，将钠基玻璃电解质嵌入碳纤维增强聚合物（CFRP）壳体。</li><li><strong>结构变化</strong>：CFRP 壳体同时承担强度和刚度功能，电池不再是独立 Pack 后嵌入承力结构，而是把储能和结构补强合并。</li><li><strong>材料特性</strong>：嵌入式钠基玻璃电解质具有压电、热释电和铁电特性。</li><li><strong>验证内容</strong>：研究开展了电学、机械性能和混凝土块拉拔测试，评估载荷传递、粘接行为及失效模式。</li><li><strong>结构影响</strong>：该路线可为轻量化承力外壳、结构健康监测和储能部件一体化提供概念参考，但目前仍属于研究验证。</li><li><strong>缺口</strong>：未公开电芯能量密度、循环寿命、工作温度、CFRP 壳体厚度、公差、界面胶体系及规模化制造工艺。</li></ul>
 <p><strong>来源</strong>：<a href="https://link.springer.com/article/10.1007/s11709-026-1345-1" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e52607f05e29" data-goatcounter-title="Springer Nature">Springer Nature</a></p>
 <p><strong>特点</strong>：这项研究的工程启发在于把电池壳体从被动保护件转为承力件，但当前公开数据不足以支持户用或便携储能产品的结构替代。</p>

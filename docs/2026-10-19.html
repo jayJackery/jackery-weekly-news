@@ -39,9 +39,9 @@
 
 <style>
 :root {
-  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
-  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
-  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  --fg:#1f2328; --muted:#656d76; --line:#e7d9cf; --link:#bc4c00;
+  --bg:#fff; --code:#faf1ea; --accent:#bc4c00;
+  --tint:#fdf6f0; --accent-soft:#fdf3ec; --line-2:#f0e2d8;
   color-scheme: light;
 }
 /* 没有显式选择时跟随系统。`:root:not([data-theme])` 与下面的 `:root[data-theme=…]`
@@ -49,22 +49,22 @@
    否则点了按钮不生效。 */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
-    --bg:#0d1117; --code:#161b22; --accent:#f0883e;
-    --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+    --fg:#e6edf3; --muted:#8b949e; --line:#3a2a1e; --link:#f0883e;
+    --bg:#16100c; --code:#1c130d; --accent:#f0883e;
+    --tint:#221812; --accent-soft:#25150a; --line-2:#3a2a1e;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
-  --bg:#0d1117; --code:#161b22; --accent:#f0883e;
-  --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+  --fg:#e6edf3; --muted:#8b949e; --line:#3a2a1e; --link:#f0883e;
+  --bg:#16100c; --code:#1c130d; --accent:#f0883e;
+  --tint:#221812; --accent-soft:#25150a; --line-2:#3a2a1e;
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
-  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
-  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  --fg:#1f2328; --muted:#656d76; --line:#e7d9cf; --link:#bc4c00;
+  --bg:#fff; --code:#faf1ea; --accent:#bc4c00;
+  --tint:#fdf6f0; --accent-soft:#fdf3ec; --line-2:#f0e2d8;
   color-scheme: light;
 }
 * { box-sizing: border-box; }
@@ -112,6 +112,55 @@ footer {
 .archive .d { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .archive .sub { color: var(--muted); font-size: 13px; }
 .archive .none { color: var(--muted); }
+.archive .subwrap { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.pchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pchip {
+  font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--tint); color: var(--fg);
+}
+.pchip .pchip-m { color: var(--muted); }
+.pchip:hover { text-decoration: none; border-color: var(--accent); }
+.index-layout { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 72px; align-items: start; }
+.archive-col { min-width: 0; max-width: 520px; }
+.timeline { min-width: 0; color: var(--muted); }
+.timeline h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 2px 0 10px; letter-spacing: .04em; }
+.cal-switch { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cal-title { font-size: 12.5px; font-weight: 600; color: var(--fg); }
+.cal-nav {
+  font: inherit; font-size: 14px; line-height: 1; width: 26px; height: 26px;
+  border: 1px solid var(--line-2); border-radius: 7px; background: transparent;
+  color: var(--muted); cursor: pointer;
+}
+.cal-nav:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.cal-nav:disabled { opacity: .35; cursor: default; }
+.cal-month { display: none; border: 1px solid var(--line-2); border-radius: 10px; background: transparent; padding: 10px 10px 7px; }
+.cal-month.active { display: block; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-week span { text-align: center; font-size: 9.5px; color: var(--muted); }
+.cal-day { position: relative; min-height: 32px; border-radius: 6px; padding: 3px 2px; }
+.cal-day.empty { visibility: hidden; }
+.cal-day.has { background: var(--code); }
+.cal-num { display: block; text-align: center; font-size: 10px; color: var(--muted); }
+.dots { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
+.dot-item { position: relative; display: inline-flex; }
+.dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.dot.fallback { background: transparent; border: 1.5px solid var(--muted); }
+.dot.more { width: auto; height: auto; background: none !important; color: var(--muted); font-size: 8.5px; }
+.dot-card {
+  display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  width: 250px; z-index: 30; background: var(--bg); border: 1px solid var(--line-2);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(60,30,10,.14); padding: 10px 12px;
+  flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.5;
+}
+.dot-item:hover .dot-card { display: flex; }
+.dc-head { display: flex; align-items: center; gap: 6px; }
+.dc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.dc-brand { font-weight: 600; }
+.dc-model { color: var(--muted); }
+.dc-title { font-weight: 600; }
+.dc-point { color: var(--fg); }
+.dc-feat { color: var(--muted); border-left: 2px solid var(--accent); padding-left: 8px; }
+.dc-date { color: var(--muted); font-size: 11px; }
 
 /* ---------------- 图文版 / 文字版 切换（纯 CSS，不用 JS） ----------------
    兄弟选择器 `~` 要求 radio 必须排在 .view / .vswitch **前面**，且同为 .wrap 的子元素。
@@ -305,6 +354,9 @@ section[id] { scroll-margin-top: 16px; }
   color: var(--muted); font-size: 12.5px;
 }
 
+@media (max-width: 760px) {
+  .index-layout { grid-template-columns: 1fr; }
+}
 @media (max-width: 520px) {
   .wrap { padding: 16px 15px 56px; }
   .archive li { flex-direction: column; gap: 2px; }
@@ -322,7 +374,7 @@ section[id] { scroll-margin-top: 16px; }
 <div class="wrap has-toggle">
 <nav class="top"><a href="2026-10-12.html">← 上一期</a><a href="index.html">全部往期</a><a href="2026-10-26.html">下一期 →</a></nav>
 <input type="radio" name="view" id="v-rich" class="vmode" checked><input type="radio" name="view" id="v-plain" class="vmode"><div class="ctrls"><span class="vswitch"><label for="v-rich">图文版</label><label for="v-plain">文字版</label></span><button type="button" class="themebtn" id="themebtn" hidden>深色</button></div><div class="view view-rich"><main><header class="hero"><div class="kicker">储能结构周报</div><h1>2026-10-19</h1><div class="meta"><span class="chip">本期 10 条</span><span class="chip">覆盖周期：2026-10-05 ~ 2026-10-19</span><span class="chip">面向储能结构工程师</span></div></header><aside class="toc toc-side" aria-label="本期目录"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">6 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">2 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">2 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></aside><div class="toc toc-inline"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">6 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">2 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">2 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></div><section class="card" id="sec-1"><div class="sec-head"><span class="sec-num">一</span><span class="sec-title">便携&amp;阳台储能竞品动态</span><span class="sec-count">6 条</span></div><article class="entry">
-<h3 class="entry-head"><span class="idx">1</span><span class="vendor">BLUETTI</span><span class="dash"> —— </span><span class="etitle">AORA 200 V2 在 2kWh 级实现容量增加与重量下降</span></h3>
+<h3 class="entry-head" id="item-1-1"><span class="idx">1</span><span class="vendor">BLUETTI</span><span class="dash"> —— </span><span class="etitle">AORA 200 V2 在 2kWh 级实现容量增加与重量下降</span></h3>
 <ul class="pts">
 <li><strong>规格</strong>：AORA 200 V2 采用 2,080Wh 磷酸铁锂电池，额定输出 2,200W，电力提升模式最高 3,300W；AC 输入最大 1,500W。</li>
 <li><strong>结构变化</strong>：机身尺寸为 235×215×290mm，重量约 20.2kg；相较 AORA 200 轻量化约 16%以上，容量则由约 2,000Wh 增至 2,080Wh。</li>
@@ -334,7 +386,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.oricon.co.jp/pressrelease/3033819/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-6c57f478c22b" data-goatcounter-title="ORICON NEWS">ORICON NEWS</a> ｜ <a href="https://www.itmedia.co.jp/pcuser/articles/2610/14/news063.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-3470b5a0d406" data-goatcounter-title="ITmedia PC USER">ITmedia PC USER</a></p>
 <p class="feat"><span class="lbl">特点</span> BLUETTI 的改款重点不是继续堆容量，而是在保持 2.2kW 输出的前提下压低 2kWh 级整机搬运负担，结构优化效果已直接反映到约 4kg 的减重上。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">2</span><span class="vendor">Anker SOLIX</span><span class="dash"> —— </span><span class="etitle">S5000 将便携电源转为带轮的 5kWh 级家庭备电设备</span></h3>
+<h3 class="entry-head" id="item-1-2"><span class="idx">2</span><span class="vendor">Anker SOLIX</span><span class="dash"> —— </span><span class="etitle">S5000 将便携电源转为带轮的 5kWh 级家庭备电设备</span></h3>
 <ul class="pts">
 <li><strong>规格</strong>：S5000 容量为 5,024Wh，额定输出 4,500W，峰值输出 8,000W，支持 120V/240V 双电压输出。</li>
 <li><strong>结构变化</strong>：整机重量为 44kg，采用脚轮与伸缩拉杆；相较约 2kWh 级 S2000，容量约提升至 2.5 倍，输出功率提升至 3 倍。</li>
@@ -346,7 +398,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://pv-magazine-usa.com/2026/10/13/anker-solix-announces-wheeled-power-station-with-4-5-kw-output/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-f181262f1d6a" data-goatcounter-title="pv magazine USA">pv magazine USA</a> ｜ <a href="https://www.notebookcheck-cn.com/Anker-Solix-S5000-5kWh-99.1421916.0.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-f72b35b789a0" data-goatcounter-title="Notebookcheck 中文">Notebookcheck 中文</a></p>
 <p class="feat"><span class="lbl">特点</span> S5000 已从单人可搬运产品转向带轮移动的家庭备电设备，结构设计的主约束将由便携性转为 44kg 载荷下的轮组、拉杆、装卸与抗冲击可靠性。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">3</span><span class="vendor">Zendure</span><span class="dash"> —— </span><span class="etitle">SolarFlow 2400 AC+ 与 2400 Pro 进入英国插电式光储市场</span></h3>
+<h3 class="entry-head" id="item-1-3"><span class="idx">3</span><span class="vendor">Zendure</span><span class="dash"> —— </span><span class="etitle">SolarFlow 2400 AC+ 与 2400 Pro 进入英国插电式光储市场</span></h3>
 <ul class="pts">
 <li><strong>规格</strong>：SolarFlow 2400 AC+ 与 SolarFlow 2400 Pro 均以 2.4kWh 为基础容量，支持扩展至 16.8kWh。</li>
 <li><strong>接口与架构</strong>：2400 AC+ 面向既有屋顶光伏，通过 AC 耦合接入，无需更换原有逆变器；2400 Pro 通过 4 路 MPPT 接入光伏，光伏输入最高 3,000W。</li>
@@ -358,7 +410,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://finance.yahoo.com/energy/articles/zendure-brings-plug-solar-uk-113100458.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-320e1a038748" data-goatcounter-title="PR Newswire via Yahoo Finance">PR Newswire via Yahoo Finance</a> ｜ <a href="https://www.nationalworld.com/must-read/zendure-launches-plug-in-solar-range-in-uk-following-rule-changes-9289773" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-65a44faf237a" data-goatcounter-title="NationalWorld">NationalWorld</a></p>
 <p class="feat"><span class="lbl">特点</span> Zendure 将同一容量平台拆成 AC 耦合改造型与直流光伏接入型两条架构，结构设计需分别处理并网主机的固定安装和扩展电池的可维护堆叠。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">4</span><span class="vendor">CARKU</span><span class="dash"> —— </span><span class="etitle">PB-102 以 16.5kg 进入 2kWh 轻量便携电源区间</span></h3>
+<h3 class="entry-head" id="item-1-4"><span class="idx">4</span><span class="vendor">CARKU</span><span class="dash"> —— </span><span class="etitle">PB-102 以 16.5kg 进入 2kWh 轻量便携电源区间</span></h3>
 <ul class="pts">
 <li><strong>规格</strong>：PB-102 容量为 2kWh，重量 16.5kg，采用磷酸铁锂电芯；厂商宣称循环寿命超过 8,000 次。</li>
 <li><strong>接口与架构</strong>：支持 AC 与光伏同时充电，光伏输入最高 450W；公开产品页列出 220V/1,000W AC 输出。</li>
@@ -369,7 +421,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.car-ku.com/products/1kwh-2200w-power-station-2kwh.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-6347278f47d4" data-goatcounter-title="CARKU 官方产品页">CARKU 官方产品页</a> ｜ <a href="https://aapnews.aap.com.au/aapreleases/cision20261014AE70610" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-52b0438614e1" data-goatcounter-title="PR Newswire via AAP">PR Newswire via AAP</a></p>
 <p class="feat"><span class="lbl">特点</span> PB-102 的核心卖点是把 2kWh 电池包压入 16.5kg 级别，但公开资料对输出规格存在口径差异，当前不能仅凭宣传数据判断其结构能量密度。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">5</span><span class="vendor">CARKU</span><span class="dash"> —— </span><span class="etitle">PB-120、PB-122 以车辆应急启动功能细分轻量产品层级</span></h3>
+<h3 class="entry-head" id="item-1-5"><span class="idx">5</span><span class="vendor">CARKU</span><span class="dash"> —— </span><span class="etitle">PB-120、PB-122 以车辆应急启动功能细分轻量产品层级</span></h3>
 <ul class="pts">
 <li><strong>规格</strong>：PB-120 提供 600W 连续 AC 输出和 100W USB PD，并集成车辆应急启动功能。</li>
 <li><strong>规格</strong>：PB-122 输出功率为 400W，重量 3.5kg，集成高亮 LED 聚光灯与 UPS 功能。</li>
@@ -380,7 +432,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.car-ku.com/products/1kwh-2200w-power-station-2kwh.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-6347278f47d4" data-goatcounter-title="CARKU 官方产品页">CARKU 官方产品页</a> ｜ <a href="https://aapnews.aap.com.au/aapreleases/cision20261014AE70610" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-52b0438614e1" data-goatcounter-title="PR Newswire via AAP">PR Newswire via AAP</a></p>
 <p class="feat"><span class="lbl">特点</span> CARKU 用“储能输出加车辆启动”的复合功能区分 PB-120 与 PB-122，但电池包和防护结构信息不足，暂时无法判断其是否采用可拆换或模块化机身。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">6</span><span class="vendor">Goal Zero</span><span class="dash"> —— </span><span class="etitle">Yeti 1500 以 IPX4 与快速充电强化户外耐候便携</span></h3>
+<h3 class="entry-head" id="item-1-6"><span class="idx">6</span><span class="vendor">Goal Zero</span><span class="dash"> —— </span><span class="etitle">Yeti 1500 以 IPX4 与快速充电强化户外耐候便携</span></h3>
 <ul class="pts">
 <li><strong>规格</strong>：Yeti 1500 容量为 1,505Wh，AC 输出 2,000W，峰值输出 3,600W，光伏输入最高 900W。</li>
 <li><strong>结构变化</strong>：产品定位为第六代便携电源，采用面向户外使用的 weather-rated 机身；相较前代的体积和重量变化未披露。</li>
@@ -393,7 +445,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://goalzero.com/fr-ca/collections/new-products" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-4ceb8c474090" data-goatcounter-title="Goal Zero New Products">Goal Zero New Products</a></p>
 <p class="feat"><span class="lbl">特点</span> Yeti 1500 的结构路线偏向户外耐候而非极限轻量化，IPX4 与高光伏输入是已公开的主要设计约束，但重量和内部防护实现方式仍不可见。</p>
 </article></section><section class="card" id="sec-2"><div class="sec-head"><span class="sec-num">二</span><span class="sec-title">户用&amp;工商业储能与大机动态</span><span class="sec-count">2 条</span></div><article class="entry">
-<h3 class="entry-head"><span class="idx">1</span><span class="vendor">Exide Technologies</span><span class="dash"> —— </span><span class="etitle">Solition Powerflex 将 261kWh 电池与 125kW PCS 集成进户外柜</span></h3>
+<h3 class="entry-head" id="item-2-1"><span class="idx">1</span><span class="vendor">Exide Technologies</span><span class="dash"> —— </span><span class="etitle">Solition Powerflex 将 261kWh 电池与 125kW PCS 集成进户外柜</span></h3>
 <ul class="pts">
 <li><strong>规格</strong>：Solition Powerflex 采用 261kWh 磷酸铁锂电池与 125kW 双向 PCS，标称往返效率为 86%。</li>
 <li><strong>结构变化</strong>：单柜内部包含 5 个电池包，每个电池包容量为 52.25kWh，电芯容量为 314Ah。</li>
@@ -404,7 +456,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.pv-magazine.com/2026/10/13/exide-launches-modular-125-kw-261-kwh-battery-for-ci-applications/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-93a568111ec2" data-goatcounter-title="pv magazine">pv magazine</a></p>
 <p class="feat"><span class="lbl">特点</span> 该方案把电池与 PCS 放在同一户外柜内，并用双液冷回路隔离两类热源，结构设计重点转向柜内分区、管路维护和并联扩容后的热一致性。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">2</span><span class="vendor">Hithium</span><span class="dash"> —— </span><span class="etitle">N785Ah 钠离子电芯配套 4MWh 系统进入验证阶段</span></h3>
+<h3 class="entry-head" id="item-2-2"><span class="idx">2</span><span class="vendor">Hithium</span><span class="dash"> —— </span><span class="etitle">N785Ah 钠离子电芯配套 4MWh 系统进入验证阶段</span></h3>
 <ul class="pts">
 <li><strong>电芯与系统</strong>：Hithium 推出 785Ah 钠离子储能电芯，并配套 4MWh 钠离子储能系统。</li>
 <li><strong>性能口径</strong>：公开报道提到该路线的目标循环寿命为 20,000 次、设计寿命为 30 年。</li>
@@ -416,7 +468,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.ess-news.com/2026/10/06/interview-hithiums-sodium-ion-storage-push-where-it-could-win-where-it-wont-and-path-to-bankability/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-cb9e175db4f1" data-goatcounter-title="ESS News">ESS News</a> ｜ <a href="https://cn.solarbe.com/news/20261016/50030502.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-010184837f8c" data-goatcounter-title="碳索储能网">碳索储能网</a></p>
 <p class="feat"><span class="lbl">特点</span> N785Ah 的结构价值在于用更少的大电芯构成 4MWh 系统，但在量产和验证完成前，不能据此直接推导柜体减重或体积收益。</p>
 </article></section><section class="card" id="sec-3"><div class="sec-head"><span class="sec-num">三</span><span class="sec-title">电池与材料技术突破</span><span class="sec-count">2 条</span></div><article class="entry">
-<h3 class="entry-head"><span class="idx">1</span><span class="vendor">巨湾技研（Greater Bay Technology）</span><span class="dash"> —— </span><span class="etitle">既有 4GWh 液态锂电产线改造为全固态电池产线</span></h3>
+<h3 class="entry-head" id="item-3-1"><span class="idx">1</span><span class="vendor">巨湾技研（Greater Bay Technology）</span><span class="dash"> —— </span><span class="etitle">既有 4GWh 液态锂电产线改造为全固态电池产线</span></h3>
 <ul class="pts">
 <li><strong>工艺路线</strong>：公司将原有 4GWh 液态锂电生产线进行局部改造，核心变化集中在电解质注入与固化工序。</li>
 <li><strong>产能状态</strong>：10 月 13 日宣布 GWh 级全固态电池产线投产，当前改造产能为 1GWh，并可根据需求继续切换至最高 4GWh。</li>
@@ -428,7 +480,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.electrive.com/2026/10/14/gbt-begins-series-production-of-solid-state-battery-cells/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-19fd05a249a2" data-goatcounter-title="Electrive">Electrive</a> ｜ <a href="https://autonews.gasgoo.com/articles/market-industry/greater-bay-technology-commissions-gwh-scale-all-solid-state-battery-production-line-2110549317063766016" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e86bfcba85c7" data-goatcounter-title="Gasgoo">Gasgoo</a></p>
 <p class="feat"><span class="lbl">特点</span> 这条路线的工程优势不是立即改变 Pack 外形，而是通过改造既有液态锂电设备导入固态工艺，结构端仍应把界面固化后的膨胀与预紧力作为主要验证项。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">2</span><span class="vendor">Great Power</span><span class="dash"> —— </span><span class="etitle">Fengpeng 587Ah 储能电芯进入量产交付阶段</span></h3>
+<h3 class="entry-head" id="item-3-2"><span class="idx">2</span><span class="vendor">Great Power</span><span class="dash"> —— </span><span class="etitle">Fengpeng 587Ah 储能电芯进入量产交付阶段</span></h3>
 <ul class="pts">
 <li><strong>量产事件</strong>：Great Power 于 10 月 10 日举行 Fengpeng 587Ah 储能电芯下线仪式。</li>
 <li><strong>制造状态</strong>：公司称大容量储能电芯已进入量产与交付阶段。</li>
@@ -483,46 +535,46 @@ section[id] { scroll-margin-top: 16px; }
 <p class="signoff">—— 本消息由自动化脚本生成，检索源：Perplexity sonar-pro-search</p></section></main></div><div class="view view-plain"><main><h1>[行业资讯] 储能结构周报（2026-10-19）</h1>
 <blockquote>覆盖周期：2026-10-05 ~ 2026-10-19 ｜ 面向储能结构工程师</blockquote>
 <h2 id="p-1">一、便携&amp;阳台储能竞品动态</h2>
-<h3>1. <strong>BLUETTI</strong> —— AORA 200 V2 在 2kWh 级实现容量增加与重量下降</h3>
+<h3 id="p-item-1-1">1. <strong>BLUETTI</strong> —— AORA 200 V2 在 2kWh 级实现容量增加与重量下降</h3>
 <ul><li><strong>规格</strong>：AORA 200 V2 采用 2,080Wh 磷酸铁锂电池，额定输出 2,200W，电力提升模式最高 3,300W；AC 输入最大 1,500W。</li><li><strong>结构变化</strong>：机身尺寸为 235×215×290mm，重量约 20.2kg；相较 AORA 200 轻量化约 16%以上，容量则由约 2,000Wh 增至 2,080Wh。</li><li><strong>接口与架构</strong>：配置 4 个 AC 输出、2 个 USB-C、2 个 USB-A 和 1 个车载点烟器接口，共 9 个输出端口。</li><li><strong>防护与寿命</strong>：厂商公布循环寿命超过 6,000 次，判定条件为初始容量的 80%。</li><li><strong>价格</strong>：日本市场建议零售价为 238,000 日元，10 月 12 日开始预约，预计 10 月下旬起发货。</li><li><strong>缺口</strong>：未公开 IP 防护等级、壳体材料、内部电池包排布、跌落等级与密封结构。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.oricon.co.jp/pressrelease/3033819/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-6c57f478c22b" data-goatcounter-title="ORICON NEWS">ORICON NEWS</a> ｜ <a href="https://www.itmedia.co.jp/pcuser/articles/2610/14/news063.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-3470b5a0d406" data-goatcounter-title="ITmedia PC USER">ITmedia PC USER</a></p>
 <p><strong>特点</strong>：BLUETTI 的改款重点不是继续堆容量，而是在保持 2.2kW 输出的前提下压低 2kWh 级整机搬运负担，结构优化效果已直接反映到约 4kg 的减重上。</p>
-<h3>2. <strong>Anker SOLIX</strong> —— S5000 将便携电源转为带轮的 5kWh 级家庭备电设备</h3>
+<h3 id="p-item-1-2">2. <strong>Anker SOLIX</strong> —— S5000 将便携电源转为带轮的 5kWh 级家庭备电设备</h3>
 <ul><li><strong>规格</strong>：S5000 容量为 5,024Wh，额定输出 4,500W，峰值输出 8,000W，支持 120V/240V 双电压输出。</li><li><strong>结构变化</strong>：整机重量为 44kg，采用脚轮与伸缩拉杆；相较约 2kWh 级 S2000，容量约提升至 2.5 倍，输出功率提升至 3 倍。</li><li><strong>接口与架构</strong>：支持扩展至 30kWh，光伏输入最高 3kW；美国版本配置 NEMA 5-20、TT-30 RV 和 L14-30 等交流接口。</li><li><strong>防护与寿命</strong>：厂商宣称循环寿命最高 10,000 次；120V 模式待机功耗为 8.8W，240V 模式为 13.7W。</li><li><strong>价格</strong>：美国市场计划于 10 月 27 日上市，首发价为 2,499.99 美元。</li><li><strong>缺口</strong>：未公开整机尺寸、IP 防护等级、壳体材料、轮组载荷设计、拉杆强度和密封结构；欧洲版本与欧元价格未披露。</li></ul>
 <p><strong>来源</strong>：<a href="https://pv-magazine-usa.com/2026/10/13/anker-solix-announces-wheeled-power-station-with-4-5-kw-output/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-f181262f1d6a" data-goatcounter-title="pv magazine USA">pv magazine USA</a> ｜ <a href="https://www.notebookcheck-cn.com/Anker-Solix-S5000-5kWh-99.1421916.0.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-f72b35b789a0" data-goatcounter-title="Notebookcheck 中文">Notebookcheck 中文</a></p>
 <p><strong>特点</strong>：S5000 已从单人可搬运产品转向带轮移动的家庭备电设备，结构设计的主约束将由便携性转为 44kg 载荷下的轮组、拉杆、装卸与抗冲击可靠性。</p>
-<h3>3. <strong>Zendure</strong> —— SolarFlow 2400 AC+ 与 2400 Pro 进入英国插电式光储市场</h3>
+<h3 id="p-item-1-3">3. <strong>Zendure</strong> —— SolarFlow 2400 AC+ 与 2400 Pro 进入英国插电式光储市场</h3>
 <ul><li><strong>规格</strong>：SolarFlow 2400 AC+ 与 SolarFlow 2400 Pro 均以 2.4kWh 为基础容量，支持扩展至 16.8kWh。</li><li><strong>接口与架构</strong>：2400 AC+ 面向既有屋顶光伏，通过 AC 耦合接入，无需更换原有逆变器；2400 Pro 通过 4 路 MPPT 接入光伏，光伏输入最高 3,000W。</li><li><strong>结构变化</strong>：两款产品均采用主机加 AB3000L 扩展电池的模块化架构，单块 AB3000L 扩展电池容量为 2.88kWh。</li><li><strong>安装要求</strong>：产品面向英国新规下的插电式光伏与家庭储能场景；2400 Pro 已在英国官网现货销售，属于需结合家庭光伏系统进行安装的固定式方案。</li><li><strong>价格</strong>：英国市场公开起售价为 1,099 英镑；2400 AC+ 单主机页面显示价格为 899 英镑。</li><li><strong>缺口</strong>：公开报道未披露主机及扩展电池的尺寸、重量、IP 防护等级、壳体材料、循环寿命和安装净距要求。</li></ul>
 <p><strong>来源</strong>：<a href="https://finance.yahoo.com/energy/articles/zendure-brings-plug-solar-uk-113100458.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-320e1a038748" data-goatcounter-title="PR Newswire via Yahoo Finance">PR Newswire via Yahoo Finance</a> ｜ <a href="https://www.nationalworld.com/must-read/zendure-launches-plug-in-solar-range-in-uk-following-rule-changes-9289773" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-65a44faf237a" data-goatcounter-title="NationalWorld">NationalWorld</a></p>
 <p><strong>特点</strong>：Zendure 将同一容量平台拆成 AC 耦合改造型与直流光伏接入型两条架构，结构设计需分别处理并网主机的固定安装和扩展电池的可维护堆叠。</p>
-<h3>4. <strong>CARKU</strong> —— PB-102 以 16.5kg 进入 2kWh 轻量便携电源区间</h3>
+<h3 id="p-item-1-4">4. <strong>CARKU</strong> —— PB-102 以 16.5kg 进入 2kWh 轻量便携电源区间</h3>
 <ul><li><strong>规格</strong>：PB-102 容量为 2kWh，重量 16.5kg，采用磷酸铁锂电芯；厂商宣称循环寿命超过 8,000 次。</li><li><strong>接口与架构</strong>：支持 AC 与光伏同时充电，光伏输入最高 450W；公开产品页列出 220V/1,000W AC 输出。</li><li><strong>结构变化</strong>：采用一体式机身，面向离网住宅、户外移动和应急备电；相较前代的体积或重量变化比例未披露。</li><li><strong>电芯与材料</strong>：厂商强调电芯具备耐高温、抗振动和热稳定性，但未公布电芯尺寸、串并联方式与电池包结构。</li><li><strong>缺口</strong>：广交会报道与产品页对 2kWh 版本的尺寸、连续输出功率口径不完全一致，且未公开 IP 防护等级、壳体材料、跌落等级和价格。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.car-ku.com/products/1kwh-2200w-power-station-2kwh.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-6347278f47d4" data-goatcounter-title="CARKU 官方产品页">CARKU 官方产品页</a> ｜ <a href="https://aapnews.aap.com.au/aapreleases/cision20261014AE70610" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-52b0438614e1" data-goatcounter-title="PR Newswire via AAP">PR Newswire via AAP</a></p>
 <p><strong>特点</strong>：PB-102 的核心卖点是把 2kWh 电池包压入 16.5kg 级别，但公开资料对输出规格存在口径差异，当前不能仅凭宣传数据判断其结构能量密度。</p>
-<h3>5. <strong>CARKU</strong> —— PB-120、PB-122 以车辆应急启动功能细分轻量产品层级</h3>
+<h3 id="p-item-1-5">5. <strong>CARKU</strong> —— PB-120、PB-122 以车辆应急启动功能细分轻量产品层级</h3>
 <ul><li><strong>规格</strong>：PB-120 提供 600W 连续 AC 输出和 100W USB PD，并集成车辆应急启动功能。</li><li><strong>规格</strong>：PB-122 输出功率为 400W，重量 3.5kg，集成高亮 LED 聚光灯与 UPS 功能。</li><li><strong>接口与架构</strong>：两款产品与 2kWh 级 PB-102 同期展示，形成高容量家庭备电、600W 户外供电和 400W 超轻量设备的分级产品架构。</li><li><strong>结构变化</strong>：PB-122 更接近移动电源式轻量机身，PB-120 则在中低功率平台加入车辆启动模块；两款产品均面向户外、车辆应急和备用供电。</li><li><strong>缺口</strong>：未公开容量、尺寸、IP 防护等级、电芯类型、光伏输入功率、壳体材料、启动电流和价格。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.car-ku.com/products/1kwh-2200w-power-station-2kwh.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-6347278f47d4" data-goatcounter-title="CARKU 官方产品页">CARKU 官方产品页</a> ｜ <a href="https://aapnews.aap.com.au/aapreleases/cision20261014AE70610" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-52b0438614e1" data-goatcounter-title="PR Newswire via AAP">PR Newswire via AAP</a></p>
 <p><strong>特点</strong>：CARKU 用“储能输出加车辆启动”的复合功能区分 PB-120 与 PB-122，但电池包和防护结构信息不足，暂时无法判断其是否采用可拆换或模块化机身。</p>
-<h3>6. <strong>Goal Zero</strong> —— Yeti 1500 以 IPX4 与快速充电强化户外耐候便携</h3>
+<h3 id="p-item-1-6">6. <strong>Goal Zero</strong> —— Yeti 1500 以 IPX4 与快速充电强化户外耐候便携</h3>
 <ul><li><strong>规格</strong>：Yeti 1500 容量为 1,505Wh，AC 输出 2,000W，峰值输出 3,600W，光伏输入最高 900W。</li><li><strong>结构变化</strong>：产品定位为第六代便携电源，采用面向户外使用的 weather-rated 机身；相较前代的体积和重量变化未披露。</li><li><strong>防护与寿命</strong>：公开参数标注 IPX4 防水等级；厂商称产品设计寿命超过 10 年。</li><li><strong>接口与架构</strong>：配置 17 个端口，支持高功率光伏输入，官方标称光伏充电时间约 1.1 小时。</li><li><strong>价格</strong>：官方页面列出常规价格 1,899.95 美元，但当前页面显示缺货。</li><li><strong>缺口</strong>：未公开整机尺寸、重量、电芯化学体系、循环寿命、壳体材料和内部防水密封结构。</li></ul>
 <p><strong>来源</strong>：<a href="https://goalzero.com/fr-ca/collections/new-products" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-4ceb8c474090" data-goatcounter-title="Goal Zero New Products">Goal Zero New Products</a></p>
 <p><strong>特点</strong>：Yeti 1500 的结构路线偏向户外耐候而非极限轻量化，IPX4 与高光伏输入是已公开的主要设计约束，但重量和内部防护实现方式仍不可见。</p>
 <p>本周期除上述条目外，未检索到 <strong>Oupes、Vtoman、Eco-Worthy、PowerOak、Hoymiles、Segway、DJI Power、EcoFlow</strong> 在 2026 年 10 月 5—19 日期间具备可核实文章详情页、且未与上一期重复的新品或结构改款动态。</p>
 <h2 id="p-2">二、户用&amp;工商业储能与大机动态</h2>
-<h3>1. <strong>Exide Technologies</strong> —— Solition Powerflex 将 261kWh 电池与 125kW PCS 集成进户外柜</h3>
+<h3 id="p-item-2-1">1. <strong>Exide Technologies</strong> —— Solition Powerflex 将 261kWh 电池与 125kW PCS 集成进户外柜</h3>
 <ul><li><strong>规格</strong>：Solition Powerflex 采用 261kWh 磷酸铁锂电池与 125kW 双向 PCS，标称往返效率为 86%。</li><li><strong>结构变化</strong>：单柜内部包含 5 个电池包，每个电池包容量为 52.25kWh，电芯容量为 314Ah。</li><li><strong>热管理</strong>：采用电池回路与 PCS 回路分开的双回路液冷/加热系统，电池侧额定 5kW，PCS 侧额定 3kW。</li><li><strong>系统架构</strong>：并网场景最多支持 15 柜并联，对应 3.915MWh 和 1.875MW；离网场景最多支持 5 柜。</li><li><strong>缺口</strong>：报道未公开整柜尺寸、重量、IP 防护等级、液冷板布置、柜内电池包固定方式和循环寿命。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.pv-magazine.com/2026/10/13/exide-launches-modular-125-kw-261-kwh-battery-for-ci-applications/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-93a568111ec2" data-goatcounter-title="pv magazine">pv magazine</a></p>
 <p><strong>特点</strong>：该方案把电池与 PCS 放在同一户外柜内，并用双液冷回路隔离两类热源，结构设计重点转向柜内分区、管路维护和并联扩容后的热一致性。</p>
-<h3>2. <strong>Hithium</strong> —— N785Ah 钠离子电芯配套 4MWh 系统进入验证阶段</h3>
+<h3 id="p-item-2-2">2. <strong>Hithium</strong> —— N785Ah 钠离子电芯配套 4MWh 系统进入验证阶段</h3>
 <ul><li><strong>电芯与系统</strong>：Hithium 推出 785Ah 钠离子储能电芯，并配套 4MWh 钠离子储能系统。</li><li><strong>性能口径</strong>：公开报道提到该路线的目标循环寿命为 20,000 次、设计寿命为 30 年。</li><li><strong>系统定位</strong>：产品面向电力储能，并计划覆盖 2～8 小时储能时长场景。</li><li><strong>结构影响</strong>：大容量电芯会减少单柜电芯数量，但电芯质量、膨胀控制、模组约束和吊装维护接口需要按钠离子体系重新验证。</li><li><strong>量产计划</strong>：厂商计划 2027 年开始全链条量产交付，当前仍处于分阶段验证推进阶段。</li><li><strong>缺口</strong>：未公开电芯尺寸、质量、能量密度、压实密度、模组数量、柜体尺寸、重量、IP 等级及液冷方案。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.ess-news.com/2026/10/06/interview-hithiums-sodium-ion-storage-push-where-it-could-win-where-it-wont-and-path-to-bankability/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-cb9e175db4f1" data-goatcounter-title="ESS News">ESS News</a> ｜ <a href="https://cn.solarbe.com/news/20261016/50030502.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-010184837f8c" data-goatcounter-title="碳索储能网">碳索储能网</a></p>
 <p><strong>特点</strong>：N785Ah 的结构价值在于用更少的大电芯构成 4MWh 系统，但在量产和验证完成前，不能据此直接推导柜体减重或体积收益。</p>
 <h2 id="p-3">三、电池与材料技术突破</h2>
-<h3>1. <strong>巨湾技研（Greater Bay Technology）</strong> —— 既有 4GWh 液态锂电产线改造为全固态电池产线</h3>
+<h3 id="p-item-3-1">1. <strong>巨湾技研（Greater Bay Technology）</strong> —— 既有 4GWh 液态锂电产线改造为全固态电池产线</h3>
 <ul><li><strong>工艺路线</strong>：公司将原有 4GWh 液态锂电生产线进行局部改造，核心变化集中在电解质注入与固化工序。</li><li><strong>产能状态</strong>：10 月 13 日宣布 GWh 级全固态电池产线投产，当前改造产能为 1GWh，并可根据需求继续切换至最高 4GWh。</li><li><strong>材料体系</strong>：采用有机—无机复合固态电解质；该电解质以液态前驱体注入电芯，再在电芯内部固化。</li><li><strong>性能指标</strong>：公司披露的平台电芯比能量范围为 260～480Wh/kg；首代量产产品为汽车用软包电芯。</li><li><strong>制造影响</strong>：极片制造、叠片、化成和测试等主要工序可继续使用传统液态锂电设备，产线可在液态与固态产品之间切换。</li><li><strong>结构影响</strong>：电解质在电芯内部固化形成弹性界面，Pack 设计仍需重新确认预紧力、长期膨胀、软包边封和热失控隔离条件。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.electrive.com/2026/10/14/gbt-begins-series-production-of-solid-state-battery-cells/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-19fd05a249a2" data-goatcounter-title="Electrive">Electrive</a> ｜ <a href="https://autonews.gasgoo.com/articles/market-industry/greater-bay-technology-commissions-gwh-scale-all-solid-state-battery-production-line-2110549317063766016" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e86bfcba85c7" data-goatcounter-title="Gasgoo">Gasgoo</a></p>
 <p><strong>特点</strong>：这条路线的工程优势不是立即改变 Pack 外形，而是通过改造既有液态锂电设备导入固态工艺，结构端仍应把界面固化后的膨胀与预紧力作为主要验证项。</p>
-<h3>2. <strong>Great Power</strong> —— Fengpeng 587Ah 储能电芯进入量产交付阶段</h3>
+<h3 id="p-item-3-2">2. <strong>Great Power</strong> —— Fengpeng 587Ah 储能电芯进入量产交付阶段</h3>
 <ul><li><strong>量产事件</strong>：Great Power 于 10 月 10 日举行 Fengpeng 587Ah 储能电芯下线仪式。</li><li><strong>制造状态</strong>：公司称大容量储能电芯已进入量产与交付阶段。</li><li><strong>Pack 影响</strong>：相比采用更小容量电芯的系统，587Ah 电芯有机会减少串并联数量、汇流连接点和模组数量。</li><li><strong>结构约束</strong>：电芯容量增大后，单体质量、壳体刚度、极柱载荷、模组压紧及热扩散路径需要以实际规格书重新校核。</li><li><strong>缺口</strong>：公开报道未披露电芯化学体系、尺寸、重量、能量密度、压实密度、循环寿命、热失控测试结果及配套 Pack 结构。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.energytrend.com/news/20261015-52292.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e2a119cc8cb8" data-goatcounter-title="EnergyTrend">EnergyTrend</a></p>
 <p><strong>特点</strong>：587Ah 电芯已从样品推进到量产交付，但缺少尺寸、重量和热安全数据，当前只能确认其对系统连接点数量有潜在简化作用，不能确认整柜能量密度收益。</p>

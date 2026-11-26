@@ -39,9 +39,9 @@
 
 <style>
 :root {
-  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
-  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
-  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  --fg:#1f2328; --muted:#656d76; --line:#e7d9cf; --link:#bc4c00;
+  --bg:#fff; --code:#faf1ea; --accent:#bc4c00;
+  --tint:#fdf6f0; --accent-soft:#fdf3ec; --line-2:#f0e2d8;
   color-scheme: light;
 }
 /* 没有显式选择时跟随系统。`:root:not([data-theme])` 与下面的 `:root[data-theme=…]`
@@ -49,22 +49,22 @@
    否则点了按钮不生效。 */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
-    --bg:#0d1117; --code:#161b22; --accent:#f0883e;
-    --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+    --fg:#e6edf3; --muted:#8b949e; --line:#3a2a1e; --link:#f0883e;
+    --bg:#16100c; --code:#1c130d; --accent:#f0883e;
+    --tint:#221812; --accent-soft:#25150a; --line-2:#3a2a1e;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --link:#4493f8;
-  --bg:#0d1117; --code:#161b22; --accent:#f0883e;
-  --tint:#161b22; --accent-soft:#25150a; --line-2:#21262d;
+  --fg:#e6edf3; --muted:#8b949e; --line:#3a2a1e; --link:#f0883e;
+  --bg:#16100c; --code:#1c130d; --accent:#f0883e;
+  --tint:#221812; --accent-soft:#25150a; --line-2:#3a2a1e;
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --fg:#1f2328; --muted:#656d76; --line:#d8dee4; --link:#0969da;
-  --bg:#fff; --code:#f6f8fa; --accent:#bc4c00;
-  --tint:#f6f8fa; --accent-soft:#fdf3ec; --line-2:#eaeef2;
+  --fg:#1f2328; --muted:#656d76; --line:#e7d9cf; --link:#bc4c00;
+  --bg:#fff; --code:#faf1ea; --accent:#bc4c00;
+  --tint:#fdf6f0; --accent-soft:#fdf3ec; --line-2:#f0e2d8;
   color-scheme: light;
 }
 * { box-sizing: border-box; }
@@ -112,6 +112,55 @@ footer {
 .archive .d { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .archive .sub { color: var(--muted); font-size: 13px; }
 .archive .none { color: var(--muted); }
+.archive .subwrap { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.pchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pchip {
+  font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--tint); color: var(--fg);
+}
+.pchip .pchip-m { color: var(--muted); }
+.pchip:hover { text-decoration: none; border-color: var(--accent); }
+.index-layout { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 72px; align-items: start; }
+.archive-col { min-width: 0; max-width: 520px; }
+.timeline { min-width: 0; color: var(--muted); }
+.timeline h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 2px 0 10px; letter-spacing: .04em; }
+.cal-switch { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cal-title { font-size: 12.5px; font-weight: 600; color: var(--fg); }
+.cal-nav {
+  font: inherit; font-size: 14px; line-height: 1; width: 26px; height: 26px;
+  border: 1px solid var(--line-2); border-radius: 7px; background: transparent;
+  color: var(--muted); cursor: pointer;
+}
+.cal-nav:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.cal-nav:disabled { opacity: .35; cursor: default; }
+.cal-month { display: none; border: 1px solid var(--line-2); border-radius: 10px; background: transparent; padding: 10px 10px 7px; }
+.cal-month.active { display: block; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-week span { text-align: center; font-size: 9.5px; color: var(--muted); }
+.cal-day { position: relative; min-height: 32px; border-radius: 6px; padding: 3px 2px; }
+.cal-day.empty { visibility: hidden; }
+.cal-day.has { background: var(--code); }
+.cal-num { display: block; text-align: center; font-size: 10px; color: var(--muted); }
+.dots { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
+.dot-item { position: relative; display: inline-flex; }
+.dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.dot.fallback { background: transparent; border: 1.5px solid var(--muted); }
+.dot.more { width: auto; height: auto; background: none !important; color: var(--muted); font-size: 8.5px; }
+.dot-card {
+  display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  width: 250px; z-index: 30; background: var(--bg); border: 1px solid var(--line-2);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(60,30,10,.14); padding: 10px 12px;
+  flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.5;
+}
+.dot-item:hover .dot-card { display: flex; }
+.dc-head { display: flex; align-items: center; gap: 6px; }
+.dc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.dc-brand { font-weight: 600; }
+.dc-model { color: var(--muted); }
+.dc-title { font-weight: 600; }
+.dc-point { color: var(--fg); }
+.dc-feat { color: var(--muted); border-left: 2px solid var(--accent); padding-left: 8px; }
+.dc-date { color: var(--muted); font-size: 11px; }
 
 /* ---------------- 图文版 / 文字版 切换（纯 CSS，不用 JS） ----------------
    兄弟选择器 `~` 要求 radio 必须排在 .view / .vswitch **前面**，且同为 .wrap 的子元素。
@@ -305,6 +354,9 @@ section[id] { scroll-margin-top: 16px; }
   color: var(--muted); font-size: 12.5px;
 }
 
+@media (max-width: 760px) {
+  .index-layout { grid-template-columns: 1fr; }
+}
 @media (max-width: 520px) {
   .wrap { padding: 16px 15px 56px; }
   .archive li { flex-direction: column; gap: 2px; }
@@ -322,7 +374,7 @@ section[id] { scroll-margin-top: 16px; }
 <div class="wrap has-toggle">
 <nav class="top"><a href="2026-11-09.html">← 上一期</a><a href="index.html">全部往期</a><a href="2026-11-23.html">下一期 →</a></nav>
 <input type="radio" name="view" id="v-rich" class="vmode" checked><input type="radio" name="view" id="v-plain" class="vmode"><div class="ctrls"><span class="vswitch"><label for="v-rich">图文版</label><label for="v-plain">文字版</label></span><button type="button" class="themebtn" id="themebtn" hidden>深色</button></div><div class="view view-rich"><main><header class="hero"><div class="kicker">储能结构周报</div><h1>2026-11-16</h1><div class="meta"><span class="chip">本期 9 条</span><span class="chip">覆盖周期：2026-11-02 ~ 2026-11-16</span><span class="chip">面向储能结构工程师</span></div></header><aside class="toc toc-side" aria-label="本期目录"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">3 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">4 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">2 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></aside><div class="toc toc-inline"><div class="toc-t">本期目录</div><ul><li><a href="#sec-1"><span class="tn">一</span><span class="toc-t2">便携&amp;阳台储能竞品动态</span><span class="tc">3 条</span></a></li><li><a href="#sec-2"><span class="tn">二</span><span class="toc-t2">户用&amp;工商业储能与大机动态</span><span class="tc">4 条</span></a></li><li><a href="#sec-3"><span class="tn">三</span><span class="toc-t2">电池与材料技术突破</span><span class="tc">2 条</span></a></li><li><a href="#sec-4"><span class="tn">四</span><span class="toc-t2">安规与政策大事件</span><span class="tc">3 个地区</span></a></li><li><a href="#sec-5"><span class="tn">五</span><span class="toc-t2">对华宝新能（Jackery）结构与产品定义的启发</span><span class="tc">3 点建议</span></a></li></ul></div><section class="card" id="sec-1"><div class="sec-head"><span class="sec-num">一</span><span class="sec-title">便携&amp;阳台储能竞品动态</span><span class="sec-count">3 条</span></div><article class="entry">
-<h3 class="entry-head"><span class="idx">1</span><span class="vendor">EcoFlow</span><span class="dash"> —— </span><span class="etitle">DELTA Gen4 把 3 kWh 级压到 26 kg，自耗比功率更先被拿来对比</span></h3>
+<h3 class="entry-head" id="item-1-1"><span class="idx">1</span><span class="vendor">EcoFlow</span><span class="dash"> —— </span><span class="etitle">DELTA Gen4 把 3 kWh 级压到 26 kg，自耗比功率更先被拿来对比</span></h3>
 <ul class="pts">
 <li><strong>发布</strong>：2026-11-04 加拿大发布 DELTA Gen4 与 RIVER Gen4 两个系列，11-07 由 pv magazine USA、11-10 由 pv magazine Latinoamérica 复核；本周期是该系列首次公开完整规格表。</li>
 <li><strong>容量与功率</strong>：DELTA 3800 Gen4 为 3,763 Wh、DELTA 3000 Gen4 为 3,072 Wh；两者交流额定输出同为 3.6 kW，瞬时峰值 7.2 kW，用于扛电机类负载的启动电流。</li>
@@ -334,7 +386,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.pv-magazine-latam.com/2026/11/10/ecoflow-lanza-las-nuevas-series-delta-gen4-y-river-gen4-en-estados-unidos/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-b2cdc8f532a9" data-goatcounter-title="pv magazine Latinoamérica">pv magazine Latinoamérica</a> ｜ <a href="https://www.newswire.ca/fr/news-releases/ecoflow-presents-delta-gen4-series-and-river-gen4-series-in-canada-delivering-longer-lasting-backup-power-in-a-smaller-lighter-design-869431089.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-189928f59364" data-goatcounter-title="Newswire 加拿大发布稿">Newswire 加拿大发布稿</a></p>
 <p class="feat"><span class="lbl">特点</span> 这一代把「同容量档更轻」和「自耗更低」一起当成卖点，说明便携机的竞争重心正从额定功率转向单位能量占用的体积与重量；但官方只给了磅数与 Wh/lb，没给外形尺寸与风道，结构侧还无法据此反推壳体壁厚与散热齿面积。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">2</span><span class="vendor">EcoFlow</span><span class="dash"> —— </span><span class="etitle">RIVER Gen4：512 Wh 机型压到 4.5 kg，140 W 双向 USB-C 成为标配</span></h3>
+<h3 class="entry-head" id="item-1-2"><span class="idx">2</span><span class="vendor">EcoFlow</span><span class="dash"> —— </span><span class="etitle">RIVER Gen4：512 Wh 机型压到 4.5 kg，140 W 双向 USB-C 成为标配</span></h3>
 <ul class="pts">
 <li><strong>发布</strong>：与 DELTA Gen4 同批公开，11-07 / 11-10 经两家 pv magazine 复核。</li>
 <li><strong>规格</strong>：RIVER 260 Gen4 为 256 Wh / 300 W / 2.7 kg（6 lb 多）；RIVER 520 Gen4 为 512 Wh / 500 W / 4.5 kg（10 lb）。</li>
@@ -346,7 +398,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.pv-magazine-latam.com/2026/11/10/ecoflow-lanza-las-nuevas-series-delta-gen4-y-river-gen4-en-estados-unidos/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-b2cdc8f532a9" data-goatcounter-title="pv magazine Latinoamérica">pv magazine Latinoamérica</a> ｜ <a href="https://www.newswire.ca/fr/news-releases/ecoflow-presents-delta-gen4-series-and-river-gen4-series-in-canada-delivering-longer-lasting-backup-power-in-a-smaller-lighter-design-869431089.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-189928f59364" data-goatcounter-title="Newswire 加拿大发布稿">Newswire 加拿大发布稿</a></p>
 <p class="feat"><span class="lbl">特点</span> 小容量档的差异化落在「待机 1 W」与「140 W 双向 USB-C」这两个电气指标上，等于用电气设计换体积；但 32% / 54% 的小型化没有配尺寸与散热路径，无法判断是靠电芯换型还是靠结构重排拿到的。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">3</span><span class="vendor">BLUETTI</span><span class="dash"> —— </span><span class="etitle">AORA 30 mini 把 140 W 充电线卷进机身，用一个机构件换掉一条易丢的线</span></h3>
+<h3 class="entry-head" id="item-1-3"><span class="idx">3</span><span class="vendor">BLUETTI</span><span class="dash"> —— </span><span class="etitle">AORA 30 mini 把 140 W 充电线卷进机身，用一个机构件换掉一条易丢的线</span></h3>
 <ul class="pts">
 <li><strong>发布</strong>：2026-11-05 日本国内开始预约，AORA 30 mini 与 2 kWh 的 AORA 200 mini 同期公开；日文媒体 11-08、11-11 复核。</li>
 <li><strong>规格</strong>：288 Wh 磷酸铁锂、额定 300 W（电力提升功能到 600 W）、约 3.3 kg、161 × 130 × 207.5 mm、本体容积约 4.3 L；官方称 300 Wh 级里最轻、同容量级小约 32%。</li>
@@ -358,7 +410,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://woodcraft-outdoor.com/news/bluetti-aora-30-mini-2026-11/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e0f4deef7020" data-goatcounter-title="WOOD CRAFT OUTDOOR">WOOD CRAFT OUTDOOR</a> ｜ <a href="https://digimaga.jp/67469/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e9f437cd6eeb" data-goatcounter-title="デジマガ">デジマガ</a></p>
 <p class="feat"><span class="lbl">特点</span> 卷绕线把「一条容易丢的线」变成壳体内的一套卷簧、导轨与止退件，收益是用户少带一个配件、厂商少一个随机附件；代价是壳体多一处伸缩开口，密封与卡线失效成为新的结构验证项。</p>
 </article></section><section class="card" id="sec-2"><div class="sec-head"><span class="sec-num">二</span><span class="sec-title">户用&amp;工商业储能与大机动态</span><span class="sec-count">4 条</span></div><article class="entry">
-<h3 class="entry-head"><span class="idx">1</span><span class="vendor">能辉科技</span><span class="dash"> —— </span><span class="etitle">捷克 160 MWh 项目群：32 台 5 MWh 液冷舱配 6 台逆变升压一体舱</span></h3>
+<h3 class="entry-head" id="item-2-1"><span class="idx">1</span><span class="vendor">能辉科技</span><span class="dash"> —— </span><span class="etitle">捷克 160 MWh 项目群：32 台 5 MWh 液冷舱配 6 台逆变升压一体舱</span></h3>
 <ul class="pts">
 <li><strong>签约</strong>：2026-11-06 公司新闻、11-11 集邦新能源网复核；项目群分布于捷克多个区域，面向电网一次调频与电力现货交易两个应用场景。</li>
 <li><strong>直流侧</strong>：32 套 N20HC5000 液冷电池集装箱，单套 5.015 MWh，直流侧合计 160.48 MWh。</li>
@@ -370,7 +422,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://m.energytrend.cn/news/20261111-149204.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e3c0e164febe" data-goatcounter-title="集邦新能源网">集邦新能源网</a></p>
 <p class="feat"><span class="lbl">特点</span> 20 ft 舱塞 12 个架、单舱 5.015 MWh，说明舱内可用容积已经被液冷管路与双重消防系统占到必须按「架」排布的程度；Pack 级与舱级两套消防并存，意味着灭火剂喷放空间也是舱体净容积的竞争项。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">2</span><span class="vendor">华为</span><span class="dash"> —— </span><span class="etitle">Luterra S2：单相 3–10 kW / 三相 5–20 kW，单机堆到 336 kWh</span></h3>
+<h3 class="entry-head" id="item-2-2"><span class="idx">2</span><span class="vendor">华为</span><span class="dash"> —— </span><span class="etitle">Luterra S2：单相 3–10 kW / 三相 5–20 kW，单机堆到 336 kWh</span></h3>
 <ul class="pts">
 <li><strong>发布</strong>：2026-11-11 ESS News；一体式户储，混合逆变器、磷酸铁锂电池与 AI 能量管理在同一机身内。</li>
 <li><strong>功率</strong>：单相 3–10 kW、三相 5–20 kW；最多 3 台 20 kW 机型并联至 60 kW。</li>
@@ -383,7 +435,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.ess-news.com/2026/11/11/huawei-unveils-20-kw-all-in-one-residential-energy-storage-system/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-fff5720e48d1" data-goatcounter-title="ESS News">ESS News</a></p>
 <p class="feat"><span class="lbl">特点</span> 255 mm 厚、46 kg 的 5 kWh 模块做到无风扇与低于 29 dB，等于把散热全部交给自然对流与壳体面积；而电芯级热隔离与泄压、排烟通道是「无风扇」成立的前提——没有风扇就没有强制排烟，泄放气体只能靠结构通道定向排出。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">3</span><span class="vendor">BigBattery</span><span class="dash"> —— </span><span class="etitle">RAIO 把 14.7 kWh 与 7.68 kW 逆变器压进 5.9 in 厚壁挂壳</span></h3>
+<h3 class="entry-head" id="item-2-3"><span class="idx">3</span><span class="vendor">BigBattery</span><span class="dash"> —— </span><span class="etitle">RAIO 把 14.7 kWh 与 7.68 kW 逆变器压进 5.9 in 厚壁挂壳</span></h3>
 <ul class="pts">
 <li><strong>发布</strong>：2026-11-13 GlobeNewswire 发布，称其为美国市场首款 UL 9540 认证的一体机。</li>
 <li><strong>构成</strong>：14.7 kWh 磷酸铁锂与 7.68 kW 混合逆变器装在同一外壳；120 / 240 V 分相输出 7.68 kW 连续。</li>
@@ -396,7 +448,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://www.worldenergynewsonline.com/article/956507414-bigbattery-launches-raio-a-ul-9540-certified-all-in-one-home-energy-storage-system-at-a-disruptive-price-point-for-the-us-market" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-87c484c8c575" data-goatcounter-title="World Energy News">World Energy News</a></p>
 <p class="feat"><span class="lbl">特点</span> 5.9 in 厚度、385.8 lb 的一体机把电池与逆变器同壳而不加风扇，等价于把「壁挂厚度」当成首要结构指标；代价是重量全部压在挂墙件上，挂点位置与承重会成为安装侧的实际门槛。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">4</span><span class="vendor">阳光电源</span><span class="dash"> —— </span><span class="etitle">PowerHarbour 模块化户储：10 kWh 一模块叠到 120 kWh，内置 V2G</span></h3>
+<h3 class="entry-head" id="item-2-4"><span class="idx">4</span><span class="vendor">阳光电源</span><span class="dash"> —— </span><span class="etitle">PowerHarbour 模块化户储：10 kWh 一模块叠到 120 kWh，内置 V2G</span></h3>
 <ul class="pts">
 <li><strong>发布</strong>：2026-11-14 墨尔本 All-Energy 展发布，The Electric Viking 报道。</li>
 <li><strong>形态</strong>：单模块 10 kWh，最多叠至 120 kWh；整机厚 255 mm；单相 / 三相可选，逆变器 5–30 kW。</li>
@@ -408,7 +460,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://theelectricviking.com/sungrow-reveals-powerharbour-modular-home-battery-with-built-in-v2g-ac-ev-charger/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-0f82c312a729" data-goatcounter-title="The Electric Viking">The Electric Viking</a></p>
 <p class="feat"><span class="lbl">特点</span> 「叠放即内部连接」把线束与端子从安装现场挪进了模块接插件，现场只剩机械堆叠；这意味着堆叠层数上限成为结构侧的主要约束——层间承重、对位公差与插接件插拔寿命必须一起算。</p>
 </article></section><section class="card" id="sec-3"><div class="sec-head"><span class="sec-num">三</span><span class="sec-title">电池与材料技术突破</span><span class="sec-count">2 条</span></div><article class="entry">
-<h3 class="entry-head"><span class="idx">1</span><span class="vendor">西安交通大学 / 中科院物理所</span><span class="dash"> —— </span><span class="etitle">无负极钠电软包跑 1,400 圈，−40 ℃ 仍剩 88%</span></h3>
+<h3 class="entry-head" id="item-3-1"><span class="idx">1</span><span class="vendor">西安交通大学 / 中科院物理所</span><span class="dash"> —— </span><span class="etitle">无负极钠电软包跑 1,400 圈，−40 ℃ 仍剩 88%</span></h3>
 <ul class="pts">
 <li><strong>发表</strong>：2026-11-02 在线发表于 Nature Energy，西安交大材料力学行为国家重点实验室薛伟江团队与中科院物理所胡勇胜合作；校方 11-03 公布，媒体同日报道。</li>
 <li><strong>设计</strong>：彻底去掉负极，充电时钠离子直接从正极沉积到裸集流体上形成金属钠，放电时再剥离；收益是省掉硬碳负极带来的重量、体积与成本。</li>
@@ -420,7 +472,7 @@ section[id] { scroll-margin-top: 16px; }
 <p class="src"><span class="lbl">来源</span> <a href="https://innovationessence.com/anode-free-sodium-battery-lasts-1400-cycles-works-at-40c/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-82011bd71f7b" data-goatcounter-title="Innovation Essence">Innovation Essence</a></p>
 <p class="feat"><span class="lbl">特点</span> 去掉负极等于把「储钠的位置」从一块硬碳片换成集流体表面的一层镀层，省掉的正是负极片与相应的装配工步；代价是界面对不均匀沉积零容忍，SEI 的均匀性从电化学问题变成面载量精度与装配一致性问题。</p>
 </article><article class="entry">
-<h3 class="entry-head"><span class="idx">2</span><span class="vendor">都灵理工大学 / BEPA</span><span class="dash"> —— </span><span class="etitle">钠电与 LFP 的差距收到约 30 Wh/kg，商用级 5,000 圈仍超 95%</span></h3>
+<h3 class="entry-head" id="item-3-2"><span class="idx">2</span><span class="vendor">都灵理工大学 / BEPA</span><span class="dash"> —— </span><span class="etitle">钠电与 LFP 的差距收到约 30 Wh/kg，商用级 5,000 圈仍超 95%</span></h3>
 <ul class="pts">
 <li><strong>访谈</strong>：2026-11-09 ESS News 转载 pv magazine Italy 对 Silvia Bodoardo（都灵理工大学教授、欧洲电池伙伴关系协会科学代表）的访谈。</li>
 <li><strong>能量密度</strong>：商用钠电电芯已达约 175 Wh/kg，先进磷酸铁锂约 205 Wh/kg，差距缩到约 30 Wh/kg；对固定式储能而言重量能量密度并非首要指标。</li>
@@ -481,41 +533,41 @@ section[id] { scroll-margin-top: 16px; }
 <p class="signoff">—— 本消息由自动化脚本生成并推送，检索与撰稿由 Doubao 完成</p></section></main></div><div class="view view-plain"><main><h1>[行业资讯] 储能结构周报（2026-11-16）</h1>
 <blockquote>覆盖周期：2026-11-02 ~ 2026-11-16 ｜ 面向储能结构工程师</blockquote>
 <h2 id="p-1">一、便携&amp;阳台储能竞品动态</h2>
-<h3>1. <strong>EcoFlow</strong> —— DELTA Gen4 把 3 kWh 级压到 26 kg，自耗比功率更先被拿来对比</h3>
+<h3 id="p-item-1-1">1. <strong>EcoFlow</strong> —— DELTA Gen4 把 3 kWh 级压到 26 kg，自耗比功率更先被拿来对比</h3>
 <ul><li><strong>发布</strong>：2026-11-04 加拿大发布 DELTA Gen4 与 RIVER Gen4 两个系列，11-07 由 pv magazine USA、11-10 由 pv magazine Latinoamérica 复核；本周期是该系列首次公开完整规格表。</li><li><strong>容量与功率</strong>：DELTA 3800 Gen4 为 3,763 Wh、DELTA 3000 Gen4 为 3,072 Wh；两者交流额定输出同为 3.6 kW，瞬时峰值 7.2 kW，用于扛电机类负载的启动电流。</li><li><strong>重量</strong>：DELTA 3000 Gen4 为 57.3 lb（约 26 kg），DELTA 3800 Gen4 为 67.5 lb（30.6 kg）；厂商称两者是各自容量档里单位重量能量密度最高的机型（自社比较）。</li><li><strong>横向换算</strong>：pv magazine 用同一把尺子算出 EcoFlow 为 55.7 Wh/lb、Anker SOLIX S5000（5,024 Wh、97 lb）为 51.8 Wh/lb；但 S5000 带轮子与伸缩拉杆，按整机重量比并不完全等价。</li><li><strong>充电路径</strong>：DELTA 3000 Gen4 四路（交流、发电机、光伏、车载点烟器）；DELTA 3800 Gen4 六路，多出「光伏 + 车载」与「光伏 + 发电机」两种组合输入。</li><li><strong>自耗</strong>：官方称空载自耗较行业常见水平降低约 70%；RIVER Gen4 上给出的是交流开启 6.6 W、待机 1 W。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.pv-magazine-latam.com/2026/11/10/ecoflow-lanza-las-nuevas-series-delta-gen4-y-river-gen4-en-estados-unidos/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-b2cdc8f532a9" data-goatcounter-title="pv magazine Latinoamérica">pv magazine Latinoamérica</a> ｜ <a href="https://www.newswire.ca/fr/news-releases/ecoflow-presents-delta-gen4-series-and-river-gen4-series-in-canada-delivering-longer-lasting-backup-power-in-a-smaller-lighter-design-869431089.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-189928f59364" data-goatcounter-title="Newswire 加拿大发布稿">Newswire 加拿大发布稿</a><br>
 <strong>特点</strong>：这一代把「同容量档更轻」和「自耗更低」一起当成卖点，说明便携机的竞争重心正从额定功率转向单位能量占用的体积与重量；但官方只给了磅数与 Wh/lb，没给外形尺寸与风道，结构侧还无法据此反推壳体壁厚与散热齿面积。</p>
-<h3>2. <strong>EcoFlow</strong> —— RIVER Gen4：512 Wh 机型压到 4.5 kg，140 W 双向 USB-C 成为标配</h3>
+<h3 id="p-item-1-2">2. <strong>EcoFlow</strong> —— RIVER Gen4：512 Wh 机型压到 4.5 kg，140 W 双向 USB-C 成为标配</h3>
 <ul><li><strong>发布</strong>：与 DELTA Gen4 同批公开，11-07 / 11-10 经两家 pv magazine 复核。</li><li><strong>规格</strong>：RIVER 260 Gen4 为 256 Wh / 300 W / 2.7 kg（6 lb 多）；RIVER 520 Gen4 为 512 Wh / 500 W / 4.5 kg（10 lb）。</li><li><strong>体积</strong>：官方称同容量级分别小约 32% 与 54%（自社比较，未给具体尺寸）。</li><li><strong>自耗</strong>：交流输出开启时 6.6 W，待机 1 W。</li><li><strong>接口与充电</strong>：140 W 双向 USB-C、多路 AC 与 USB 输出、可拆背带；充电四路（交流、USB-C、光伏、车载），支持应急供电模式与 UPS 功能。</li><li><strong>待确认</strong>：循环寿命、电芯体系、防护等级三项在本周期公开资料里都没有给出。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.pv-magazine-latam.com/2026/11/10/ecoflow-lanza-las-nuevas-series-delta-gen4-y-river-gen4-en-estados-unidos/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-b2cdc8f532a9" data-goatcounter-title="pv magazine Latinoamérica">pv magazine Latinoamérica</a> ｜ <a href="https://www.newswire.ca/fr/news-releases/ecoflow-presents-delta-gen4-series-and-river-gen4-series-in-canada-delivering-longer-lasting-backup-power-in-a-smaller-lighter-design-869431089.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-189928f59364" data-goatcounter-title="Newswire 加拿大发布稿">Newswire 加拿大发布稿</a><br>
 <strong>特点</strong>：小容量档的差异化落在「待机 1 W」与「140 W 双向 USB-C」这两个电气指标上，等于用电气设计换体积；但 32% / 54% 的小型化没有配尺寸与散热路径，无法判断是靠电芯换型还是靠结构重排拿到的。</p>
-<h3>3. <strong>BLUETTI</strong> —— AORA 30 mini 把 140 W 充电线卷进机身，用一个机构件换掉一条易丢的线</h3>
+<h3 id="p-item-1-3">3. <strong>BLUETTI</strong> —— AORA 30 mini 把 140 W 充电线卷进机身，用一个机构件换掉一条易丢的线</h3>
 <ul><li><strong>发布</strong>：2026-11-05 日本国内开始预约，AORA 30 mini 与 2 kWh 的 AORA 200 mini 同期公开；日文媒体 11-08、11-11 复核。</li><li><strong>规格</strong>：288 Wh 磷酸铁锂、额定 300 W（电力提升功能到 600 W）、约 3.3 kg、161 × 130 × 207.5 mm、本体容积约 4.3 L；官方称 300 Wh 级里最轻、同容量级小约 32%。</li><li><strong>线缆结构</strong>：内置 140 W 双向卷绕式 USB-C 线，拉出即可给手机或笔记本供电，同一根线也能给本体充电；官方称通过 1 万次伸缩耐久测试。</li><li><strong>接口</strong>：合计 7 个——AC 两口（最大 300 W）、USB-C 15 W、USB-C 140 W、卷绕 USB-C 140 W、USB-A 15 W、点烟口 120 W。</li><li><strong>充电</strong>：AC 输入最大 300 W（充电 + 旁路时 400 W）、点烟 XT60 最大 100 W、USB-C 最大 140 W、光伏输入。</li><li><strong>寿命与同系列</strong>：6,000 次循环后保持 70% 以上；AORA 200 mini 为 2,010 Wh / 1,500 W / 约 18.8 kg，计划 12 月中旬上市。</li></ul>
 <p><strong>来源</strong>：<a href="https://woodcraft-outdoor.com/news/bluetti-aora-30-mini-2026-11/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e0f4deef7020" data-goatcounter-title="WOOD CRAFT OUTDOOR">WOOD CRAFT OUTDOOR</a> ｜ <a href="https://digimaga.jp/67469/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e9f437cd6eeb" data-goatcounter-title="デジマガ">デジマガ</a><br>
 <strong>特点</strong>：卷绕线把「一条容易丢的线」变成壳体内的一套卷簧、导轨与止退件，收益是用户少带一个配件、厂商少一个随机附件；代价是壳体多一处伸缩开口，密封与卡线失效成为新的结构验证项。</p>
 <h2 id="p-2">二、户用&amp;工商业储能与大机动态</h2>
-<h3>1. <strong>能辉科技</strong> —— 捷克 160 MWh 项目群：32 台 5 MWh 液冷舱配 6 台逆变升压一体舱</h3>
+<h3 id="p-item-2-1">1. <strong>能辉科技</strong> —— 捷克 160 MWh 项目群：32 台 5 MWh 液冷舱配 6 台逆变升压一体舱</h3>
 <ul><li><strong>签约</strong>：2026-11-06 公司新闻、11-11 集邦新能源网复核；项目群分布于捷克多个区域，面向电网一次调频与电力现货交易两个应用场景。</li><li><strong>直流侧</strong>：32 套 N20HC5000 液冷电池集装箱，单套 5.015 MWh，直流侧合计 160.48 MWh。</li><li><strong>交流侧</strong>：6 套逆变升压一体舱，按 4 MW × 2、5 MW × 2、10 MW × 2 三种规格配置，合计 38 MW，按各并网点的接入条件分别匹配。</li><li><strong>舱体结构</strong>：每台 20 ft 预制舱内集成 12 个电池架，采用 Pack 级与舱级双重消防、智能液冷温控与多层安全监控，电芯为磷酸铁锂。</li><li><strong>收益模式</strong>：投运后同时提供电网一次调频（毫秒级功率响应）与现货市场套利，一套资产两条收入线。</li><li><strong>累计</strong>：此前已在捷克交付 12.5 MW / 45 MWh，加本次累计达 50.5 MW / 205 MWh。</li></ul>
 <p><strong>来源</strong>：<a href="https://m.energytrend.cn/news/20261111-149204.html" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-e3c0e164febe" data-goatcounter-title="集邦新能源网">集邦新能源网</a><br>
 <strong>特点</strong>：20 ft 舱塞 12 个架、单舱 5.015 MWh，说明舱内可用容积已经被液冷管路与双重消防系统占到必须按「架」排布的程度；Pack 级与舱级两套消防并存，意味着灭火剂喷放空间也是舱体净容积的竞争项。</p>
-<h3>2. <strong>华为</strong> —— Luterra S2：单相 3–10 kW / 三相 5–20 kW，单机堆到 336 kWh</h3>
+<h3 id="p-item-2-2">2. <strong>华为</strong> —— Luterra S2：单相 3–10 kW / 三相 5–20 kW，单机堆到 336 kWh</h3>
 <ul><li><strong>发布</strong>：2026-11-11 ESS News；一体式户储，混合逆变器、磷酸铁锂电池与 AI 能量管理在同一机身内。</li><li><strong>功率</strong>：单相 3–10 kW、三相 5–20 kW；最多 3 台 20 kW 机型并联至 60 kW。</li><li><strong>电池模块</strong>：5.02 / 7.03 kWh（可用 4.9 / 6.9 kWh），两种模块尺寸同为 590 × 255 × 290 mm、重 46 / 57 kg；单系统最多 48 个电池包，标称最大 336 kWh。</li><li><strong>电气</strong>：SiC 器件加 ANPC 拓扑，单相峰值效率 98.6%、三相 99%；MPPT 最多 3 路、每路 18 A，三相光伏输入 40 kWp。</li><li><strong>备份能力</strong>：备电切换低于 10 ms，离网连续输出 20 kW（20 kW 机型 10 s 峰值 40 kW）。</li><li><strong>热与防护</strong>：无风扇被动散热、噪声低于 29 dB；工作温度 −25~60 ℃、IP66、C5-M 防腐；电池侧有电芯级热隔离、泄压与排烟通道，AC/DC 端子连续测温。</li><li><strong>认证</strong>：TÜV 莱茵完成过热失控、火烧与氢爆测试；官方报 UL 9540A 通过，并具备 IEC 63027 电弧保护。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.ess-news.com/2026/11/11/huawei-unveils-20-kw-all-in-one-residential-energy-storage-system/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-fff5720e48d1" data-goatcounter-title="ESS News">ESS News</a><br>
 <strong>特点</strong>：255 mm 厚、46 kg 的 5 kWh 模块做到无风扇与低于 29 dB，等于把散热全部交给自然对流与壳体面积；而电芯级热隔离与泄压、排烟通道是「无风扇」成立的前提——没有风扇就没有强制排烟，泄放气体只能靠结构通道定向排出。</p>
-<h3>3. <strong>BigBattery</strong> —— RAIO 把 14.7 kWh 与 7.68 kW 逆变器压进 5.9 in 厚壁挂壳</h3>
+<h3 id="p-item-2-3">3. <strong>BigBattery</strong> —— RAIO 把 14.7 kWh 与 7.68 kW 逆变器压进 5.9 in 厚壁挂壳</h3>
 <ul><li><strong>发布</strong>：2026-11-13 GlobeNewswire 发布，称其为美国市场首款 UL 9540 认证的一体机。</li><li><strong>构成</strong>：14.7 kWh 磷酸铁锂与 7.68 kW 混合逆变器装在同一外壳；120 / 240 V 分相输出 7.68 kW 连续。</li><li><strong>光伏输入</strong>：11.52 kW、3 路独立 MPPT（90–500 V，最大直流 550 V）。</li><li><strong>网关</strong>：另配 RAIO Smart Energy Gateway，160 A 连续 / 200 A 最大，可接 64 A 发电机。</li><li><strong>结构与防护</strong>：外壳约 30 × 49 × 5.9 in、385.8 lb，IP66 / NEMA 4X，自然对流散热，噪声低于 31 dB。</li><li><strong>效率与认证</strong>：97.5% CEC、98% 峰值效率；UL 9540 认证，铭牌另列 UL 1973、UL 1741 / 1741 SB、IEEE 1547。</li><li><strong>扩展</strong>：最多 5 台并联至 73.5 kWh / 38.4 kW，12 年质保。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.worldenergynewsonline.com/article/956507414-bigbattery-launches-raio-a-ul-9540-certified-all-in-one-home-energy-storage-system-at-a-disruptive-price-point-for-the-us-market" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-87c484c8c575" data-goatcounter-title="World Energy News">World Energy News</a><br>
 <strong>特点</strong>：5.9 in 厚度、385.8 lb 的一体机把电池与逆变器同壳而不加风扇，等价于把「壁挂厚度」当成首要结构指标；代价是重量全部压在挂墙件上，挂点位置与承重会成为安装侧的实际门槛。</p>
-<h3>4. <strong>阳光电源</strong> —— PowerHarbour 模块化户储：10 kWh 一模块叠到 120 kWh，内置 V2G</h3>
+<h3 id="p-item-2-4">4. <strong>阳光电源</strong> —— PowerHarbour 模块化户储：10 kWh 一模块叠到 120 kWh，内置 V2G</h3>
 <ul><li><strong>发布</strong>：2026-11-14 墨尔本 All-Energy 展发布，The Electric Viking 报道。</li><li><strong>形态</strong>：单模块 10 kWh，最多叠至 120 kWh；整机厚 255 mm；单相 / 三相可选，逆变器 5–30 kW。</li><li><strong>结构</strong>：模块上下叠放即完成内部电气连接，不需要现场外部接线；内置交流电动车充电器并支持 V2G，待车型与法规就绪后启用。</li><li><strong>软件</strong>：内置 Buli AI 引擎，按天气预报、用电习惯与电价自动充放；支持语音诊断，能识别并纠正 CT 装反。</li><li><strong>质保与状态</strong>：10 年质保（按吞吐电量计，10 年末不低于 70%）；Q1 上市，CEC 认证在走。</li><li><strong>同场发布</strong>：工商业 PowerKeeper 为 110 kW 混合方案，50 kWh 可叠至 1 MWh，输出 660 kW，离网切换低于 10 ms。</li></ul>
 <p><strong>来源</strong>：<a href="https://theelectricviking.com/sungrow-reveals-powerharbour-modular-home-battery-with-built-in-v2g-ac-ev-charger/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-0f82c312a729" data-goatcounter-title="The Electric Viking">The Electric Viking</a><br>
 <strong>特点</strong>：「叠放即内部连接」把线束与端子从安装现场挪进了模块接插件，现场只剩机械堆叠；这意味着堆叠层数上限成为结构侧的主要约束——层间承重、对位公差与插接件插拔寿命必须一起算。</p>
 <h2 id="p-3">三、电池与材料技术突破</h2>
-<h3>1. <strong>西安交通大学 / 中科院物理所</strong> —— 无负极钠电软包跑 1,400 圈，−40 ℃ 仍剩 88%</h3>
+<h3 id="p-item-3-1">1. <strong>西安交通大学 / 中科院物理所</strong> —— 无负极钠电软包跑 1,400 圈，−40 ℃ 仍剩 88%</h3>
 <ul><li><strong>发表</strong>：2026-11-02 在线发表于 Nature Energy，西安交大材料力学行为国家重点实验室薛伟江团队与中科院物理所胡勇胜合作；校方 11-03 公布，媒体同日报道。</li><li><strong>设计</strong>：彻底去掉负极，充电时钠离子直接从正极沉积到裸集流体上形成金属钠，放电时再剥离；收益是省掉硬碳负极带来的重量、体积与成本。</li><li><strong>电解液</strong>：以环醚 1,3-二氧六环（DOX）作弱配位溶剂，帮助钠离子脱溶剂化；同时在电极表面「可控界面聚合」生成短链低聚物，形成薄而稳的 SEI，替代持续分解电解液的老路径。</li><li><strong>实测</strong>：300 mAh 级无负极软包，正极面载量约 20 mg/cm²，1C 下 1,400 圈保持约 80%；支持 3C 充放；−40 ℃ 下保持室温容量的 88%；往返能量效率最高约 98%。</li><li><strong>同行评价</strong>：Nature Energy 同期配发 News &amp; Views 评论《Directing solvent reactivity》，校方将其作为方法论被认可的标志。</li><li><strong>边界</strong>：300 mAh 级软包仍远小于车用与机架用多安时电芯，1,400 圈也低于商用固定式储能动辄数千圈的预期；放大、安全验证与长期测试是明确的下一步。</li></ul>
 <p><strong>来源</strong>：<a href="https://innovationessence.com/anode-free-sodium-battery-lasts-1400-cycles-works-at-40c/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-82011bd71f7b" data-goatcounter-title="Innovation Essence">Innovation Essence</a><br>
 <strong>特点</strong>：去掉负极等于把「储钠的位置」从一块硬碳片换成集流体表面的一层镀层，省掉的正是负极片与相应的装配工步；代价是界面对不均匀沉积零容忍，SEI 的均匀性从电化学问题变成面载量精度与装配一致性问题。</p>
-<h3>2. <strong>都灵理工大学 / BEPA</strong> —— 钠电与 LFP 的差距收到约 30 Wh/kg，商用级 5,000 圈仍超 95%</h3>
+<h3 id="p-item-3-2">2. <strong>都灵理工大学 / BEPA</strong> —— 钠电与 LFP 的差距收到约 30 Wh/kg，商用级 5,000 圈仍超 95%</h3>
 <ul><li><strong>访谈</strong>：2026-11-09 ESS News 转载 pv magazine Italy 对 Silvia Bodoardo（都灵理工大学教授、欧洲电池伙伴关系协会科学代表）的访谈。</li><li><strong>能量密度</strong>：商用钠电电芯已达约 175 Wh/kg，先进磷酸铁锂约 205 Wh/kg，差距缩到约 30 Wh/kg；对固定式储能而言重量能量密度并非首要指标。</li><li><strong>温度与循环</strong>：CATL 第二代钠电标称 −40~70 ℃，−40 ℃ 下保持约 90% 容量；商用级电芯 5,000 次满深度循环后容量保持仍超过 95%。</li><li><strong>出货节奏</strong>：CATL 于 2026 年 6 月发布钠电储能电芯，2026 年底累计出货约 1 GWh，2027 年开始国际交付；2025 年全球钠电产量仍不足锂电的 1%。</li><li><strong>欧洲进展</strong>：Altris、Clarios、InoBat 于 2026 年 9 月称其欧洲钠水平台完成客户验证；意大利 FAAM 已把钠电列入产品管线。</li><li><strong>适用段</strong>：4–8 小时大储最合适；户用短期不划算，因为磷酸铁锂已足够便宜、紧凑、可融资且供应链成熟。</li></ul>
 <p><strong>来源</strong>：<a href="https://www.ess-news.com/2026/11/09/sodium-ion-narrows-the-gap-with-lithium-ion-says-polytechnic-university-of-turin-professor/" target="_blank" rel="noopener noreferrer" data-goatcounter-click="source-2b5ba2153945" data-goatcounter-title="ESS News">ESS News</a><br>
 <strong>特点</strong>：把钠电落点定在 4–8 小时大储，等于承认它短期不会进户用柜；对结构岗的含义是钠电模组的体积与重量劣势可以被机架与舱体吸收，而户用产品仍要按磷酸铁锂的体积密度设计壳体。</p>
